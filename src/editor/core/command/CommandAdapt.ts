@@ -6,8 +6,8 @@ import { EditorContext, EditorMode } from '../../dataset/enum/Editor'
 import { ElementType } from '../../dataset/enum/Element'
 import { ElementStyleKey } from '../../dataset/enum/ElementStyle'
 import { RowFlex } from '../../dataset/enum/Row'
-import { IDrawImagePayload } from '../../interface/Draw'
-import { IEditorOption } from '../../interface/Editor'
+import { IDrawImagePayload, IPainterOptions } from '../../interface/Draw'
+import { IEditorOption, IEditorResult } from '../../interface/Editor'
 import { IElement, IElementStyle } from '../../interface/Element'
 import { IColgroup } from '../../interface/table/Colgroup'
 import { ITd } from '../../interface/table/Td'
@@ -126,7 +126,7 @@ export class CommandAdapt {
     this.historyManager.redo()
   }
 
-  public painter() {
+  public painter(options: IPainterOptions) {
     const isReadonly = this.draw.isReadonly()
     if (isReadonly) return
     const selection = this.range.getSelection()
@@ -141,7 +141,7 @@ export class CommandAdapt {
         }
       })
     })
-    this.draw.setPainterStyle(painterStyle)
+    this.draw.setPainterStyle(painterStyle, options)
   }
 
   public applyPainterStyle() {
@@ -262,6 +262,8 @@ export class CommandAdapt {
   public superscript() {
     const isReadonly = this.draw.isReadonly()
     if (isReadonly) return
+    const activeControl = this.control.getActiveControl()
+    if (activeControl) return
     const selection = this.range.getSelection()
     if (!selection) return
     const superscriptIndex = selection.findIndex(s => s.type === ElementType.SUPERSCRIPT)
@@ -285,6 +287,8 @@ export class CommandAdapt {
   public subscript() {
     const isReadonly = this.draw.isReadonly()
     if (isReadonly) return
+    const activeControl = this.control.getActiveControl()
+    if (activeControl) return
     const selection = this.range.getSelection()
     if (!selection) return
     const subscriptIndex = selection.findIndex(s => s.type === ElementType.SUBSCRIPT)
@@ -382,6 +386,8 @@ export class CommandAdapt {
   public insertTable(row: number, col: number) {
     const isReadonly = this.draw.isReadonly()
     if (isReadonly) return
+    const activeControl = this.control.getActiveControl()
+    if (activeControl) return
     const { startIndex, endIndex } = this.range.getRange()
     if (!~startIndex && !~endIndex) return
     const elementList = this.draw.getElementList()
@@ -979,6 +985,8 @@ export class CommandAdapt {
   public hyperlink(payload: IElement) {
     const isReadonly = this.draw.isReadonly()
     if (isReadonly) return
+    const activeControl = this.control.getActiveControl()
+    if (activeControl) return
     const { startIndex, endIndex } = this.range.getRange()
     if (!~startIndex && !~endIndex) return
     const elementList = this.draw.getElementList()
@@ -1005,6 +1013,8 @@ export class CommandAdapt {
   public separator(payload: number[]) {
     const isReadonly = this.draw.isReadonly()
     if (isReadonly) return
+    const activeControl = this.control.getActiveControl()
+    if (activeControl) return
     const { startIndex, endIndex } = this.range.getRange()
     if (!~startIndex && !~endIndex) return
     const elementList = this.draw.getElementList()
@@ -1035,6 +1045,10 @@ export class CommandAdapt {
   }
 
   public pageBreak() {
+    const isReadonly = this.draw.isReadonly()
+    if (isReadonly) return
+    const activeControl = this.control.getActiveControl()
+    if (activeControl) return
     this.insertElementList([{
       type: ElementType.PAGE_BREAK,
       value: WRAP
@@ -1073,6 +1087,8 @@ export class CommandAdapt {
   public image(payload: IDrawImagePayload) {
     const isReadonly = this.draw.isReadonly()
     if (isReadonly) return
+    const activeControl = this.control.getActiveControl()
+    if (activeControl) return
     const { startIndex, endIndex } = this.range.getRange()
     if (!~startIndex && !~endIndex) return
     const elementList = this.draw.getElementList()
@@ -1103,6 +1119,8 @@ export class CommandAdapt {
   }
 
   public replace(payload: string) {
+    const isReadonly = this.draw.isReadonly()
+    if (isReadonly) return
     if (!payload || new RegExp(`${ZERO}`, 'g').test(payload)) return
     const matchList = this.draw.getSearch().getSearchMatchList()
     if (!matchList.length) return
@@ -1221,6 +1239,10 @@ export class CommandAdapt {
     return this.draw.getDataURL()
   }
 
+  public getValue(): IEditorResult {
+    return this.draw.getValue()
+  }
+
   public pageScaleRecovery() {
     const { scale } = this.options
     if (scale !== 1) {
@@ -1248,36 +1270,7 @@ export class CommandAdapt {
     if (!payload.length) return
     const isReadonly = this.draw.isReadonly()
     if (isReadonly) return
-    const activeControl = this.control.getActiveControl()
-    if (activeControl) return
-    const isPartRangeInControlOutside = this.control.isPartRangeInControlOutside()
-    if (isPartRangeInControlOutside) return
-    const { startIndex, endIndex } = this.range.getRange()
-    if (!~startIndex && !~endIndex) return
-    // 格式化element
-    formatElementList(payload, {
-      isHandleFirstElement: false,
-      editorOptions: this.options
-    })
-    const elementList = this.draw.getElementList()
-    const isCollapsed = startIndex === endIndex
-    const start = startIndex + 1
-    if (!isCollapsed) {
-      elementList.splice(start, endIndex - startIndex)
-    }
-    const positionContext = this.position.getPositionContext()
-    for (let i = 0; i < payload.length; i++) {
-      const element = payload[i]
-      if (positionContext.isTable) {
-        element.tdId = positionContext.tdId
-        element.trId = positionContext.trId
-        element.tableId = positionContext.tableId
-      }
-      elementList.splice(start + i, 0, element)
-    }
-    const curIndex = startIndex + payload.length
-    this.range.setRange(curIndex, curIndex)
-    this.draw.render({ curIndex })
+    this.draw.insertElementList(payload)
   }
 
 }

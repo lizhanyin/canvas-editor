@@ -1,15 +1,12 @@
-import { version } from '../../../../package.json'
 import { ElementType } from '../..'
 import { ZERO } from '../../dataset/constant/Common'
 import { EDITOR_ELEMENT_COPY_ATTR } from '../../dataset/constant/Element'
 import { ElementStyleKey } from '../../dataset/enum/ElementStyle'
 import { MouseEventButton } from '../../dataset/enum/Event'
 import { KeyMap } from '../../dataset/enum/Keymap'
-import { IEditorResult } from '../../interface/Editor'
 import { IElement } from '../../interface/Element'
 import { ICurrentPosition } from '../../interface/Position'
-import { writeTextByElementList } from '../../utils/clipboard'
-import { zipElementList } from '../../utils/element'
+import { writeElementList } from '../../utils/clipboard'
 import { Cursor } from '../cursor/Cursor'
 import { Draw } from '../draw/Draw'
 import { HyperlinkParticle } from '../draw/particle/HyperlinkParticle'
@@ -21,6 +18,7 @@ import { Position } from '../position/Position'
 import { RangeManager } from '../range/RangeManager'
 import { LETTER_REG, NUMBER_LIKE_REG } from '../../dataset/constant/Regular'
 import { Control } from '../draw/control/Control'
+import { CheckboxControl } from '../draw/control/checkbox/CheckboxControl'
 
 export class CanvasEvent {
 
@@ -76,10 +74,14 @@ export class CanvasEvent {
     }
   }
 
-  public applyPainterStyle() {
+  public clearPainterStyle() {
     this.pageList.forEach(p => {
       p.style.cursor = 'text'
     })
+    this.draw.setPainterStyle(null)
+  }
+
+  public applyPainterStyle() {
     const painterStyle = this.draw.getPainterStyle()
     if (!painterStyle) return
     const selection = this.range.getSelection()
@@ -91,8 +93,12 @@ export class CanvasEvent {
         s[key] = painterStyle[key] as any
       })
     })
-    this.draw.setPainterStyle(null)
     this.draw.render({ isSetCursor: false })
+    // 清除格式刷
+    const painterOptions = this.draw.getPainterOptions()
+    if (!painterOptions || !painterOptions.isDblclick) {
+      this.clearPainterStyle()
+    }
   }
 
   public mousemove(evt: MouseEvent) {
@@ -167,7 +173,7 @@ export class CanvasEvent {
       y: evt.offsetY
     })
     // 激活控件
-    if (positionResult.isControl) {
+    if (positionResult.isControl && !isReadonly) {
       const {
         index,
         isTable,
@@ -191,6 +197,7 @@ export class CanvasEvent {
     const {
       index,
       isDirectHit,
+      isCheckbox,
       isControl,
       isImage,
       isTable,
@@ -204,6 +211,7 @@ export class CanvasEvent {
     // 设置位置上下文
     this.position.setPositionContext({
       isTable: isTable || false,
+      isCheckbox: isCheckbox || false,
       isControl: isControl || false,
       index,
       trIndex,
@@ -217,27 +225,38 @@ export class CanvasEvent {
       ...positionResult,
       index: isTable ? tdValueIndex! : index
     }
-    // 绘制
-    const isDirectHitImage = isDirectHit && isImage
-    if (~index) {
-      let curIndex = index
-      if (isTable) {
-        this.range.setRange(tdValueIndex!, tdValueIndex!)
-        curIndex = tdValueIndex!
-      } else {
-        this.range.setRange(index, index)
-      }
-      this.draw.render({
-        curIndex,
-        isSubmitHistory: false,
-        isSetCursor: !isDirectHitImage,
-        isComputeRowList: false
-      })
-    }
     const elementList = this.draw.getElementList()
     const positionList = this.position.getPositionList()
     const curIndex = isTable ? tdValueIndex! : index
     const curElement = elementList[curIndex]
+    // 绘制
+    const isDirectHitImage = !!(isDirectHit && isImage)
+    const isDirectHitCheckbox = !!(isDirectHit && isCheckbox)
+    if (~index) {
+      this.range.setRange(curIndex, curIndex)
+      // 复选框
+      const isSetCheckbox = isDirectHitCheckbox && !isReadonly
+      if (isSetCheckbox) {
+        const { checkbox } = curElement
+        if (checkbox) {
+          checkbox.value = !checkbox.value
+        } else {
+          curElement.checkbox = {
+            value: true
+          }
+        }
+        const activeControl = this.control.getActiveControl()
+        if (activeControl instanceof CheckboxControl) {
+          activeControl.setSelect()
+        }
+      }
+      this.draw.render({
+        curIndex,
+        isSubmitHistory: isSetCheckbox,
+        isSetCursor: !isDirectHitImage && !isDirectHitCheckbox,
+        isComputeRowList: false
+      })
+    }
     // 图片尺寸拖拽组件
     this.imageParticle.clearResizer()
     if (isDirectHitImage && !isReadonly) {
@@ -273,7 +292,6 @@ export class CanvasEvent {
     const { index } = cursorPosition
     const { startIndex, endIndex } = this.range.getRange()
     const isCollapsed = startIndex === endIndex
-    const element = elementList[index]
     // 当前激活控件
     const isPartRangeInControlOutside = this.control.isPartRangeInControlOutside()
     const activeControl = this.control.getActiveControl()
@@ -300,8 +318,10 @@ export class CanvasEvent {
     } else if (evt.key === KeyMap.Delete) {
       if (isReadonly || isPartRangeInControlOutside) return
       let curIndex: number
-      if (activeControl && elementList[endIndex + 1]?.controlId === element.controlId) {
+      if (activeControl) {
         curIndex = this.control.keydown(evt)
+      } else if (elementList[endIndex + 1]?.type === ElementType.CONTROL) {
+        curIndex = this.control.removeControl(endIndex + 1)
       } else {
         if (!isCollapsed) {
           elementList.splice(startIndex + 1, endIndex - startIndex)
@@ -419,11 +439,12 @@ export class CanvasEvent {
       this.selectAll()
     } else if (evt.ctrlKey && evt.key === KeyMap.S) {
       if (isReadonly) return
-      const saved = this.listener.saved
-      if (saved) {
-        saved(this.save())
+      if (this.listener.saved) {
+        this.listener.saved(this.draw.getValue())
       }
       evt.preventDefault()
+    } else if (evt.key === KeyMap.ESC) {
+      this.clearPainterStyle()
     }
   }
 
@@ -550,7 +571,7 @@ export class CanvasEvent {
     const { startIndex, endIndex } = this.range.getRange()
     const elementList = this.draw.getElementList()
     if (startIndex !== endIndex) {
-      writeTextByElementList(elementList.slice(startIndex + 1, endIndex + 1))
+      writeElementList(elementList.slice(startIndex + 1, endIndex + 1))
       let curIndex: number
       if (activeControl) {
         curIndex = this.control.cut()
@@ -567,7 +588,7 @@ export class CanvasEvent {
     const { startIndex, endIndex } = this.range.getRange()
     const elementList = this.draw.getElementList()
     if (startIndex !== endIndex) {
-      writeTextByElementList(elementList.slice(startIndex + 1, endIndex + 1))
+      writeElementList(elementList.slice(startIndex + 1, endIndex + 1))
     }
   }
 
@@ -587,22 +608,6 @@ export class CanvasEvent {
 
   public compositionend() {
     this.isCompositing = false
-  }
-
-  public save(): IEditorResult {
-    // 配置
-    const { width, height, margins, watermark } = this.draw.getOptions()
-    // 数据
-    const elementList = this.draw.getOriginalElementList()
-    const data = zipElementList(elementList)
-    return {
-      version,
-      width,
-      height,
-      margins,
-      watermark: watermark.data ? watermark : undefined,
-      data
-    }
   }
 
 }

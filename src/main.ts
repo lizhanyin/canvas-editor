@@ -30,7 +30,15 @@ window.onload = function () {
   const painterDom = document.querySelector<HTMLDivElement>('.menu-item__painter')!
   painterDom.onclick = function () {
     console.log('painter')
-    instance.command.executePainter()
+    instance.command.executePainter({
+      isDblclick: false
+    })
+  }
+  painterDom.ondblclick = function () {
+    console.log('painter')
+    instance.command.executePainter({
+      isDblclick: true
+    })
   }
 
   document.querySelector<HTMLDivElement>('.menu-item__format')!.onclick = function () {
@@ -415,7 +423,7 @@ window.onload = function () {
     switch (type) {
       case ControlType.TEXT:
         new Dialog({
-          title: '文本型控件',
+          title: '文本控件',
           data: [{
             type: 'text',
             label: '占位符',
@@ -449,7 +457,7 @@ window.onload = function () {
         break
       case ControlType.SELECT:
         new Dialog({
-          title: '列举型控件',
+          title: '列举控件',
           data: [{
             type: 'text',
             label: '占位符',
@@ -487,9 +495,50 @@ window.onload = function () {
           }
         })
         break
+      case ControlType.CHECKBOX:
+        new Dialog({
+          title: '复选框控件',
+          data: [{
+            type: 'text',
+            label: '默认值',
+            name: 'code',
+            placeholder: '请输入默认值，多个值以英文逗号分割'
+          }, {
+            type: 'textarea',
+            label: '值集',
+            name: 'valueSets',
+            height: 100,
+            placeholder: `请输入值集JSON，例：\n[{\n"value":"有",\n"code":"98175"\n}]`
+          }],
+          onConfirm: (payload) => {
+            const valueSets = payload.find(p => p.name === 'valueSets')?.value
+            if (!valueSets) return
+            const code = payload.find(p => p.name === 'code')?.value
+            instance.command.executeInsertElementList([{
+              type: ElementType.CONTROL,
+              value: '',
+              control: {
+                type,
+                code,
+                value: null,
+                valueSets: JSON.parse(valueSets)
+              }
+            }])
+          }
+        })
+        break
       default:
         break
     }
+  }
+
+  const checkboxDom = document.querySelector<HTMLDivElement>('.menu-item__checkbox')!
+  checkboxDom.onclick = function () {
+    console.log('checkbox')
+    instance.command.executeInsertElementList([{
+      type: ElementType.CHECKBOX,
+      value: ''
+    }])
   }
 
   // 5. | 搜索&替换 | 打印 |
@@ -667,6 +716,26 @@ window.onload = function () {
 
   instance.listener.pageScaleChange = function (payload) {
     document.querySelector<HTMLSpanElement>('.page-scale-percentage')!.innerText = `${Math.floor(payload * 10 * 10)}%`
+  }
+
+  instance.listener.controlChange = function (payload) {
+    const disableMenusInControlContext = [
+      'superscript',
+      'subscript',
+      'table',
+      'image',
+      'hyperlink',
+      'separator',
+      'codeblock',
+      'page-break',
+      'control',
+      'checkbox'
+    ]
+    // 菜单操作权限
+    disableMenusInControlContext.forEach(menu => {
+      const menuDom = document.querySelector<HTMLDivElement>(`.menu-item__${menu}`)!
+      payload ? menuDom.classList.add('disable') : menuDom.classList.remove('disable')
+    })
   }
 
   instance.listener.saved = function (payload) {

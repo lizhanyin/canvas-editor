@@ -1,9 +1,14 @@
 import { ControlComponent, ControlType } from '../../../dataset/enum/Control'
 import { ElementType } from '../../../dataset/enum/Element'
-import { IControlInitOption, IControlInstance, IControlOption } from '../../../interface/Control'
+import { IControl, IControlInitOption, IControlInstance, IControlOption } from '../../../interface/Control'
 import { IElement, IElementPosition } from '../../../interface/Element'
+import { IRange } from '../../../interface/Range'
+import { deepClone } from '../../../utils'
+import { pickElementAttr, zipElementList } from '../../../utils/element'
+import { Listener } from '../../listener/Listener'
 import { RangeManager } from '../../range/RangeManager'
 import { Draw } from '../Draw'
+import { CheckboxControl } from './checkbox/CheckboxControl'
 import { SelectControl } from './select/SelectControl'
 import { TextControl } from './text/TextControl'
 
@@ -15,12 +20,14 @@ export class Control {
 
   private draw: Draw
   private range: RangeManager
+  private listener: Listener
   private options: IControlOption
   private activeControl: IControlInstance | null
 
   constructor(draw: Draw) {
     this.draw = draw
     this.range = draw.getRange()
+    this.listener = draw.getListener()
     this.options = draw.getOptions().control
     this.activeControl = null
   }
@@ -61,7 +68,7 @@ export class Control {
     return this.draw.getPageNo() * (height + pageGap)
   }
 
-  public getRange() {
+  public getRange(): IRange {
     return this.range.getRange()
   }
 
@@ -74,6 +81,8 @@ export class Control {
   }
 
   public initControl() {
+    const isReadonly = this.draw.isReadonly()
+    if (isReadonly) return
     const elementList = this.getElementList()
     const range = this.getRange()
     const element = elementList[range.startIndex]
@@ -96,7 +105,22 @@ export class Control {
       const selectControl = new SelectControl(element, this)
       this.activeControl = selectControl
       selectControl.awake()
+    } else if (control.type === ControlType.CHECKBOX) {
+      this.activeControl = new CheckboxControl(element, this)
     }
+    // 激活控件回调
+    setTimeout(() => {
+      if (this.listener.controlChange) {
+        let payload: IControl
+        const value = this.activeControl?.getValue()
+        if (value && value.length) {
+          payload = zipElementList(value)[0].control!
+        } else {
+          payload = pickElementAttr(deepClone(element)).control!
+        }
+        this.listener.controlChange(payload)
+      }
+    })
   }
 
   public destroyControl() {
@@ -105,6 +129,12 @@ export class Control {
         this.activeControl.destroy()
       }
       this.activeControl = null
+      // 销毁控件回调
+      setTimeout(() => {
+        if (this.listener.controlChange) {
+          this.listener.controlChange(null)
+        }
+      })
     }
   }
 
@@ -134,7 +164,7 @@ export class Control {
       }
     } else if (element.controlComponent === ControlComponent.POSTFIX) {
       // POSTFIX-移动到最后一个后缀字符后
-      let startIndex = index + 1
+      let startIndex = newIndex + 1
       while (startIndex < elementList.length) {
         const nextElement = elementList[startIndex]
         if (nextElement.controlId !== element.controlId) {
@@ -147,7 +177,7 @@ export class Control {
       }
     } else if (element.controlComponent === ControlComponent.PREFIX) {
       // PREFIX-移动到最后一个前缀字符后
-      let startIndex = index + 1
+      let startIndex = newIndex + 1
       while (startIndex < elementList.length) {
         const nextElement = elementList[startIndex]
         if (
@@ -163,7 +193,7 @@ export class Control {
       }
     } else if (element.controlComponent === ControlComponent.PLACEHOLDER) {
       // PLACEHOLDER-移动到第一个前缀后
-      let startIndex = index - 1
+      let startIndex = newIndex - 1
       while (startIndex > 0) {
         const preElement = elementList[startIndex]
         if (
@@ -209,6 +239,10 @@ export class Control {
       }
       nextIndex++
     }
+    // 控件在最后
+    if (nextIndex === elementList.length) {
+      rightIndex = nextIndex - 1
+    }
     if (!~leftIndex || !~rightIndex) return startIndex
     // 删除元素
     elementList.splice(leftIndex + 1, rightIndex - leftIndex)
@@ -240,6 +274,7 @@ export class Control {
     const elementList = this.getElementList()
     const startElement = elementList[startIndex]
     const control = startElement.control!
+    if (!control.placeholder) return
     const placeholderStrList = control.placeholder.split('')
     for (let p = 0; p < placeholderStrList.length; p++) {
       const value = placeholderStrList[p]

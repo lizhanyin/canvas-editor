@@ -1,7 +1,8 @@
+import { version } from '../../../../package.json'
 import { ZERO } from '../../dataset/constant/Common'
 import { RowFlex } from '../../dataset/enum/Row'
-import { IDrawOption, IDrawRowPayload, IDrawRowResult } from '../../interface/Draw'
-import { IEditorOption } from '../../interface/Editor'
+import { IDrawOption, IDrawRowPayload, IDrawRowResult, IPainterOptions } from '../../interface/Draw'
+import { IEditorOption, IEditorResult } from '../../interface/Editor'
 import { IElement, IElementMetrics, IElementPosition, IElementFillRect, IElementStyle } from '../../interface/Element'
 import { IRow, IRowElement } from '../../interface/Row'
 import { deepClone, getUUID } from '../../utils'
@@ -35,6 +36,11 @@ import { PageBreakParticle } from './particle/PageBreak'
 import { Watermark } from './frame/Watermark'
 import { EditorMode } from '../../dataset/enum/Editor'
 import { Control } from './control/Control'
+import { zipElementList } from '../../utils/element'
+import { CheckboxParticle } from './particle/CheckboxParticle'
+import { DeepRequired } from '../../interface/Common'
+import { ControlComponent } from '../../dataset/enum/Control'
+import { formatElementList } from '../../utils/element'
 
 export class Draw {
 
@@ -44,7 +50,7 @@ export class Draw {
   private ctxList: CanvasRenderingContext2D[]
   private pageNo: number
   private mode: EditorMode
-  private options: Required<IEditorOption>
+  private options: DeepRequired<IEditorOption>
   private position: Position
   private elementList: IElement[]
   private listener: Listener
@@ -71,17 +77,19 @@ export class Draw {
   private pageBreakParticle: PageBreakParticle
   private superscriptParticle: SuperscriptParticle
   private subscriptParticle: SubscriptParticle
+  private checkboxParticle: CheckboxParticle
   private control: Control
 
   private rowList: IRow[]
   private painterStyle: IElementStyle | null
+  private painterOptions: IPainterOptions | null
   private searchKeyword: string | null
   private visiblePageNoList: number[]
   private intersectionPageNo: number
 
   constructor(
     container: HTMLDivElement,
-    options: Required<IEditorOption>,
+    options: DeepRequired<IEditorOption>,
     elementList: IElement[],
     listener: Listener
   ) {
@@ -118,6 +126,7 @@ export class Draw {
     this.pageBreakParticle = new PageBreakParticle(this)
     this.superscriptParticle = new SuperscriptParticle()
     this.subscriptParticle = new SubscriptParticle()
+    this.checkboxParticle = new CheckboxParticle(this)
     this.control = new Control(this)
 
     new ScrollObserver(this)
@@ -131,6 +140,7 @@ export class Draw {
 
     this.rowList = []
     this.painterStyle = null
+    this.painterOptions = null
     this.searchKeyword = null
     this.visiblePageNoList = []
     this.intersectionPageNo = 0
@@ -247,7 +257,7 @@ export class Draw {
     return this.ctxList[this.pageNo]
   }
 
-  public getOptions(): Required<IEditorOption> {
+  public getOptions(): DeepRequired<IEditorOption> {
     return this.options
   }
 
@@ -274,6 +284,41 @@ export class Draw {
       return this.elementList[index!].trList![trIndex!].tdList[tdIndex!].value
     }
     return this.elementList
+  }
+
+  public insertElementList(payload: IElement[]) {
+    if (!payload.length) return
+    const activeControl = this.control.getActiveControl()
+    if (activeControl) return
+    const isPartRangeInControlOutside = this.control.isPartRangeInControlOutside()
+    if (isPartRangeInControlOutside) return
+    const { startIndex, endIndex } = this.range.getRange()
+    if (!~startIndex && !~endIndex) return
+    formatElementList(payload, {
+      isHandleFirstElement: false,
+      editorOptions: this.options
+    })
+    const elementList = this.getElementList()
+    const isCollapsed = startIndex === endIndex
+    const start = startIndex + 1
+    if (!isCollapsed) {
+      elementList.splice(start, endIndex - startIndex)
+    }
+    const positionContext = this.position.getPositionContext()
+    for (let i = 0; i < payload.length; i++) {
+      const element = payload[i]
+      if (positionContext.isTable) {
+        element.tdId = positionContext.tdId
+        element.trId = positionContext.trId
+        element.tableId = positionContext.tableId
+      }
+      elementList.splice(start + i, 0, element)
+    }
+    const curIndex = startIndex + payload.length
+    this.range.setRange(curIndex, curIndex)
+    this.render({
+      curIndex
+    })
   }
 
   public getOriginalElementList() {
@@ -320,8 +365,13 @@ export class Draw {
     return this.painterStyle && Object.keys(this.painterStyle).length ? this.painterStyle : null
   }
 
-  public setPainterStyle(payload: IElementStyle | null) {
+  public getPainterOptions(): IPainterOptions | null {
+    return this.painterOptions
+  }
+
+  public setPainterStyle(payload: IElementStyle | null, options?: IPainterOptions) {
     this.painterStyle = payload
+    this.painterOptions = options || null
     if (this.getPainterStyle()) {
       this.pageList.forEach(c => c.style.cursor = 'copy')
     }
@@ -359,6 +409,21 @@ export class Draw {
     this.render({ isSubmitHistory: false, isSetCursor: false })
     if (this.listener.pageScaleChange) {
       this.listener.pageScaleChange(payload)
+    }
+  }
+
+  public getValue(): IEditorResult {
+    // 配置
+    const { width, height, margins, watermark } = this.options
+    // 数据
+    const data = zipElementList(this.elementList)
+    return {
+      version,
+      width,
+      height,
+      margins,
+      watermark: watermark.data ? watermark : undefined,
+      data
     }
   }
 
@@ -546,6 +611,15 @@ export class Draw {
         element.width = innerWidth
         metrics.width = innerWidth
         metrics.height = this.options.defaultSize
+      } else if (
+        element.type === ElementType.CHECKBOX ||
+        element.controlComponent === ControlComponent.CHECKBOX
+      ) {
+        const { width, height, gap } = this.options.checkbox
+        const elementWidth = (width + gap * 2) * scale
+        element.width = elementWidth
+        metrics.width = elementWidth
+        metrics.height = height * scale
       } else {
         // 设置上下标真实字体尺寸
         const size = element.size || this.options.defaultSize
@@ -556,6 +630,9 @@ export class Draw {
         ctx.font = this._getFont(element)
         const fontMetrics = this.textParticle.measureText(ctx, element)
         metrics.width = fontMetrics.width * scale
+        if (element.letterSpacing) {
+          metrics.width += element.letterSpacing * scale
+        }
         metrics.boundingBoxAscent = (element.value === ZERO ? defaultSize : fontMetrics.actualBoundingBoxAscent) * scale
         metrics.boundingBoxDescent = fontMetrics.actualBoundingBoxDescent * scale
         if (element.type === ElementType.SUPERSCRIPT) {
@@ -680,6 +757,12 @@ export class Draw {
           if (this.mode !== EditorMode.CLEAN) {
             this.pageBreakParticle.render(ctx, element, x, y)
           }
+        } else if (
+          element.type === ElementType.CHECKBOX ||
+          element.controlComponent === ControlComponent.CHECKBOX
+        ) {
+          this.textParticle.complete()
+          this.checkboxParticle.render(ctx, element, x, y + offsetY)
         } else {
           this.textParticle.record(ctx, element, x, y + offsetY)
         }
@@ -697,25 +780,36 @@ export class Draw {
         }
         // 选区记录
         const { startIndex, endIndex } = this.range.getRange()
-        if (startIndex !== endIndex && startIndex < index && index <= endIndex) {
-          const positionContext = this.position.getPositionContext()
-          // 表格需限定上下文
-          if (
-            (!positionContext.isTable && !element.tdId)
-            || positionContext.tdId === element.tdId
-          ) {
-            let rangeWidth = metrics.width
-            // 最小选区宽度
-            if (rangeWidth === 0 && curRow.elementList.length === 1) {
-              rangeWidth = this.options.rangeMinWidth
-            }
-            // 记录第一次位置、行高
-            if (!rangeRecord.width) {
-              rangeRecord.x = x
+        if (startIndex !== endIndex && startIndex <= index && index <= endIndex) {
+          // 从行尾开始-绘制最小宽度
+          if (startIndex === index) {
+            const nextElement = this.elementList[startIndex + 1]
+            if (nextElement && nextElement.value === ZERO) {
+              rangeRecord.x = x + metrics.width
               rangeRecord.y = y
               rangeRecord.height = curRow.height
+              rangeRecord.width += this.options.rangeMinWidth
             }
-            rangeRecord.width += rangeWidth
+          } else {
+            const positionContext = this.position.getPositionContext()
+            // 表格需限定上下文
+            if (
+              (!positionContext.isTable && !element.tdId)
+              || positionContext.tdId === element.tdId
+            ) {
+              let rangeWidth = metrics.width
+              // 最小选区宽度
+              if (rangeWidth === 0 && curRow.elementList.length === 1) {
+                rangeWidth = this.options.rangeMinWidth
+              }
+              // 记录第一次位置、行高
+              if (!rangeRecord.width) {
+                rangeRecord.x = x
+                rangeRecord.y = y
+                rangeRecord.height = curRow.height
+              }
+              rangeRecord.width += rangeWidth
+            }
           }
         }
         index++

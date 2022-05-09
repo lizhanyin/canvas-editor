@@ -172,6 +172,7 @@ ul {
   color: #c0c4cc;
   cursor: not-allowed;
   opacity: 0.4;
+  pointer-events: none;
 }
 
 .menu-item__undo i {
@@ -436,6 +437,10 @@ ul {
 
 .menu-item__control i {
   background-image: url('./assets/images/control.svg');
+}
+
+.menu-item__checkbox i {
+  background-image: url('./assets/images/checkbox.svg');
 }
 
 .menu-item .menu-item__control .options {

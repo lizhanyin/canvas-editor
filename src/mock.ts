@@ -246,6 +246,28 @@ elementList.push({
   }]
 })
 
+// 模拟checkbox
+elementList.push(...<IElement[]>[{
+  value: '是否同意以上内容：'
+}, {
+  type: ElementType.CONTROL,
+  control: {
+    type: ControlType.CHECKBOX,
+    code: '98175',
+    value: '',
+    valueSets: [{
+      value: '同意',
+      code: '98175'
+    }, {
+      value: '否定',
+      code: '98176'
+    }]
+  },
+  value: ''
+}, {
+  value: '\n'
+}])
+
 // 模拟结尾文本
 elementList.push(...[{
   value: 'E',

@@ -1,6 +1,7 @@
 import { ControlComponent } from '../dataset/enum/Control'
 import { ElementType } from '../dataset/enum/Element'
 import { RowFlex } from '../dataset/enum/Row'
+import { ICheckbox } from './Checkbox'
 import { IControl } from './Control'
 import { IColgroup } from './table/Colgroup'
 import { ITr } from './table/Tr'
@@ -24,6 +25,7 @@ export interface IElementStyle {
   strikeout?: boolean;
   rowFlex?: RowFlex;
   rowMargin?: number;
+  letterSpacing?: number;
 }
 
 export interface ITableAttr {
@@ -59,6 +61,10 @@ export interface IControlElement {
   controlComponent?: ControlComponent;
 }
 
+export interface ICheckboxElement {
+  checkbox?: ICheckbox;
+}
+
 export type IElement = IElementBasic
   & IElementStyle
   & ITable
@@ -66,6 +72,7 @@ export type IElement = IElementBasic
   & ISuperscriptSubscript
   & ISeparator
   & IControlElement
+  & ICheckboxElement
 
 export interface IElementMetrics {
   width: number;
