@@ -116,7 +116,7 @@ export class Position {
           }
         }
         // 图片区域均为命中
-        if (element.type === ElementType.IMAGE) {
+        if (element.type === ElementType.IMAGE || element.type === ElementType.LATEX) {
           return {
             index: curPositionIndex,
             isDirectHit: true,
@@ -189,7 +189,7 @@ export class Position {
     }
     return {
       index: curPositionIndex,
-      isControl: elementList[curPositionIndex].type === ElementType.CONTROL
+      isControl: elementList[curPositionIndex]?.type === ElementType.CONTROL
     }
   }
 

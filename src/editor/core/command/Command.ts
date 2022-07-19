@@ -1,5 +1,5 @@
 import { IElement } from '../..'
-import { EditorMode } from '../../dataset/enum/Editor'
+import { EditorMode, PageMode } from '../../dataset/enum/Editor'
 import { RowFlex } from '../../dataset/enum/Row'
 import { IDrawImagePayload, IPainterOptions } from '../../interface/Draw'
 import { IEditorResult } from '../../interface/Editor'
@@ -48,6 +48,8 @@ export class Command {
   private static cancelMergeTableCell: Function
   private static image: Function
   private static hyperlink: Function
+  private static deleteHyperlink: Function
+  private static cancelHyperlink: Function
   private static separator: Function
   private static pageBreak: Function
   private static addWatermark: Function
@@ -55,12 +57,17 @@ export class Command {
   private static search: Function
   private static replace: Function
   private static print: Function
+  private static replaceImageElement: Function
+  private static saveAsImageElement: Function
   private static getImage: Function
   private static getValue: Function
+  private static getWordCount: Function
+  private static pageMode: Function
   private static pageScaleRecovery: Function
   private static pageScaleMinus: Function
   private static pageScaleAdd: Function
   private static insertElementList: Function
+  private static removeControl: Function
 
   constructor(adapt: CommandAdapt) {
     Command.mode = adapt.mode.bind(adapt)
@@ -102,6 +109,8 @@ export class Command {
     Command.cancelMergeTableCell = adapt.cancelMergeTableCell.bind(adapt)
     Command.image = adapt.image.bind(adapt)
     Command.hyperlink = adapt.hyperlink.bind(adapt)
+    Command.deleteHyperlink = adapt.deleteHyperlink.bind(adapt)
+    Command.cancelHyperlink = adapt.cancelHyperlink.bind(adapt)
     Command.separator = adapt.separator.bind(adapt)
     Command.pageBreak = adapt.pageBreak.bind(adapt)
     Command.addWatermark = adapt.addWatermark.bind(adapt)
@@ -109,12 +118,17 @@ export class Command {
     Command.search = adapt.search.bind(adapt)
     Command.replace = adapt.replace.bind(adapt)
     Command.print = adapt.print.bind(adapt)
+    Command.replaceImageElement = adapt.replaceImageElement.bind(adapt)
+    Command.saveAsImageElement = adapt.saveAsImageElement.bind(adapt)
     Command.getImage = adapt.getImage.bind(adapt)
     Command.getValue = adapt.getValue.bind(adapt)
+    Command.getWordCount = adapt.getWordCount.bind(adapt)
+    Command.pageMode = adapt.pageMode.bind(adapt)
     Command.pageScaleRecovery = adapt.pageScaleRecovery.bind(adapt)
     Command.pageScaleMinus = adapt.pageScaleMinus.bind(adapt)
     Command.pageScaleAdd = adapt.pageScaleAdd.bind(adapt)
     Command.insertElementList = adapt.insertElementList.bind(adapt)
+    Command.removeControl = adapt.removeControl.bind(adapt)
   }
 
   // 全局命令
@@ -273,6 +287,14 @@ export class Command {
     return Command.hyperlink(payload)
   }
 
+  public executeDeleteHyperlink() {
+    return Command.deleteHyperlink()
+  }
+
+  public executeCancelHyperlink() {
+    return Command.cancelHyperlink()
+  }
+
   public executeImage(payload: IDrawImagePayload) {
     return Command.image(payload)
   }
@@ -305,6 +327,14 @@ export class Command {
     return Command.print()
   }
 
+  public executeReplaceImageElement(payload: string) {
+    return Command.replaceImageElement(payload)
+  }
+
+  public executeSaveAsImageElement() {
+    return Command.saveAsImageElement()
+  }
+
   public getImage(): string[] {
     return Command.getImage()
   }
@@ -313,7 +343,15 @@ export class Command {
     return Command.getValue()
   }
 
-  // 页面缩放
+  public getWordCount(): Promise<number> {
+    return Command.getWordCount()
+  }
+
+  // 页面模式、页面缩放
+  public executePageMode(payload: PageMode) {
+    return Command.pageMode(payload)
+  }
+
   public executePageScaleRecovery() {
     return Command.pageScaleRecovery()
   }
@@ -329,6 +367,10 @@ export class Command {
   // 通用
   public executeInsertElementList(payload: IElement[]) {
     return Command.insertElementList(payload)
+  }
+
+  public executeRemoveControl() {
+    return Command.removeControl()
   }
 
 }

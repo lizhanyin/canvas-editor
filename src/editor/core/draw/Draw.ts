@@ -21,6 +21,7 @@ import { Strikeout } from './richtext/Strikeout'
 import { Underline } from './richtext/Underline'
 import { ElementType } from '../../dataset/enum/Element'
 import { ImageParticle } from './particle/ImageParticle'
+import { LaTexParticle } from './particle/latex/LaTexParticle'
 import { TextParticle } from './particle/TextParticle'
 import { PageNumber } from './frame/PageNumber'
 import { ScrollObserver } from '../observer/ScrollObserver'
@@ -34,13 +35,15 @@ import { SubscriptParticle } from './particle/Subscript'
 import { SeparatorParticle } from './particle/Separator'
 import { PageBreakParticle } from './particle/PageBreak'
 import { Watermark } from './frame/Watermark'
-import { EditorMode } from '../../dataset/enum/Editor'
+import { EditorMode, PageMode } from '../../dataset/enum/Editor'
 import { Control } from './control/Control'
 import { zipElementList } from '../../utils/element'
 import { CheckboxParticle } from './particle/CheckboxParticle'
 import { DeepRequired } from '../../interface/Common'
 import { ControlComponent } from '../../dataset/enum/Control'
 import { formatElementList } from '../../utils/element'
+import { WorkerManager } from '../worker/WorkerManager'
+import { Previewer } from './particle/previewer/Previewer'
 
 export class Draw {
 
@@ -65,7 +68,9 @@ export class Draw {
   private strikeout: Strikeout
   private highlight: Highlight
   private historyManager: HistoryManager
+  private previewer: Previewer
   private imageParticle: ImageParticle
+  private laTexParticle: LaTexParticle
   private textParticle: TextParticle
   private tableParticle: TableParticle
   private tableTool: TableTool
@@ -79,6 +84,7 @@ export class Draw {
   private subscriptParticle: SubscriptParticle
   private checkboxParticle: CheckboxParticle
   private control: Control
+  private workerManager: WorkerManager
 
   private rowList: IRow[]
   private painterStyle: IElementStyle | null
@@ -97,7 +103,7 @@ export class Draw {
     this.pageList = []
     this.ctxList = []
     this.pageNo = 0
-    this.mode = options.defaultMode
+    this.mode = options.mode
     this.options = options
     this.elementList = elementList
     this.listener = listener
@@ -114,7 +120,9 @@ export class Draw {
     this.underline = new Underline(this)
     this.strikeout = new Strikeout(this)
     this.highlight = new Highlight(this)
+    this.previewer = new Previewer(this)
     this.imageParticle = new ImageParticle(this)
+    this.laTexParticle = new LaTexParticle(this)
     this.textParticle = new TextParticle(this)
     this.tableParticle = new TableParticle(this)
     this.tableTool = new TableTool(this)
@@ -137,6 +145,8 @@ export class Draw {
     this.canvasEvent.register()
     const globalEvent = new GlobalEvent(this, this.canvasEvent)
     globalEvent.register()
+
+    this.workerManager = new WorkerManager(this)
 
     this.rowList = []
     this.painterStyle = null
@@ -166,6 +176,16 @@ export class Draw {
 
   public getHeight(): number {
     return Math.floor(this.options.height * this.options.scale)
+  }
+
+  public getCanvasWidth(): number {
+    const page = this.getPage()
+    return page.width
+  }
+
+  public getCanvasHeight(): number {
+    const page = this.getPage()
+    return page.height
   }
 
   public getInnerWidth(): number {
@@ -337,6 +357,10 @@ export class Draw {
     return this.cursor
   }
 
+  public getPreviewer(): Previewer {
+    return this.previewer
+  }
+
   public getImageParticle(): ImageParticle {
     return this.imageParticle
   }
@@ -351,6 +375,10 @@ export class Draw {
 
   public getControl(): Control {
     return this.control
+  }
+
+  public getWorkerManager(): WorkerManager {
+    return this.workerManager
   }
 
   public getRowCount(): number {
@@ -391,6 +419,26 @@ export class Draw {
       const curIndex = this.elementList.length - 1
       this.range.setRange(curIndex, curIndex)
       this.range.setRangeStyle()
+    })
+  }
+
+  public setPageMode(payload: PageMode) {
+    if (!payload || this.options.pageMode === payload) return
+    this.options.pageMode = payload
+    // 纸张大小重置
+    if (payload === PageMode.PAGING) {
+      const { height } = this.options
+      const dpr = window.devicePixelRatio
+      const canvas = this.pageList[0]
+      canvas.style.height = `${height}px`
+      canvas.height = height * dpr
+    }
+    this.render({ isSubmitHistory: false, isSetCursor: false })
+    // 回调
+    setTimeout(() => {
+      if (this.listener.pageModeChange) {
+        this.listener.pageModeChange(payload)
+      }
     })
   }
 
@@ -490,7 +538,7 @@ export class Draw {
         boundingBoxAscent: 0,
         boundingBoxDescent: 0
       }
-      if (element.type === ElementType.IMAGE) {
+      if (element.type === ElementType.IMAGE || element.type === ElementType.LATEX) {
         const elementWidth = element.width! * scale
         const elementHeight = element.height! * scale
         // 图片超出尺寸后自适应
@@ -667,7 +715,7 @@ export class Draw {
         curRow.width += metrics.width
         if (curRow.height < height) {
           curRow.height = height
-          if (element.type === ElementType.IMAGE) {
+          if (element.type === ElementType.IMAGE || element.type === ElementType.LATEX) {
             curRow.ascent = metrics.height
           } else {
             curRow.ascent = ascent
@@ -711,7 +759,7 @@ export class Draw {
       for (let j = 0; j < curRow.elementList.length; j++) {
         const element = curRow.elementList[j]
         const metrics = element.metrics
-        const offsetY = element.type === ElementType.IMAGE
+        const offsetY = element.type === ElementType.IMAGE || element.type === ElementType.LATEX
           ? curRow.ascent - metrics.height
           : curRow.ascent
         const positionItem: IElementPosition = {
@@ -735,6 +783,9 @@ export class Draw {
         if (element.type === ElementType.IMAGE) {
           this.textParticle.complete()
           this.imageParticle.render(ctx, element, x, y + offsetY)
+        } else if (element.type === ElementType.LATEX) {
+          this.textParticle.complete()
+          this.laTexParticle.render(ctx, element, x, y + offsetY)
         } else if (element.type === ElementType.TABLE) {
           if (isCrossRowCol) {
             rangeRecord.x = x
@@ -855,12 +906,12 @@ export class Draw {
   }
 
   private _drawPage(positionList: IElementPosition[], rowList: IRow[], pageNo: number) {
-    const width = this.getWidth()
-    const height = this.getHeight()
+    const { pageMode } = this.options
     const margins = this.getMargins()
     const innerWidth = this.getInnerWidth()
     const ctx = this.ctxList[pageNo]
-    ctx.clearRect(0, 0, width, height)
+    const pageDom = this.pageList[pageNo]
+    ctx.clearRect(0, 0, pageDom.width, pageDom.height)
     // 绘制背景
     this.background.render(ctx)
     // 绘制页边距
@@ -891,12 +942,13 @@ export class Draw {
       this.search.render(ctx, pageNo)
     }
     // 绘制水印
-    if (this.options.watermark.data) {
+    if (pageMode !== PageMode.CONTINUITY && this.options.watermark.data) {
       this.waterMark.render(ctx)
     }
   }
 
   public render(payload?: IDrawOption) {
+    const { pageMode } = this.options
     const {
       isSubmitHistory = true,
       isSetCursor = true,
@@ -922,15 +974,32 @@ export class Draw {
     let pageHeight = marginHeight
     let pageNo = 0
     const pageRowList: IRow[][] = [[]]
-    for (let i = 0; i < this.rowList.length; i++) {
-      const row = this.rowList[i]
-      if (row.height + pageHeight > height || this.rowList[i - 1]?.isPageBreak) {
-        pageHeight = marginHeight + row.height
-        pageRowList.push([row])
-        pageNo++
+    if (pageMode === PageMode.CONTINUITY) {
+      pageRowList[0] = this.rowList
+      // 重置高度
+      pageHeight += this.rowList.reduce((pre, cur) => pre + cur.height, 0)
+      const dpr = window.devicePixelRatio
+      const pageDom = this.pageList[0]
+      const pageDomHeight = Number(pageDom.style.height.replace('px', ''))
+      if (pageHeight > pageDomHeight) {
+        pageDom.style.height = `${pageHeight}px`
+        pageDom.height = pageHeight * dpr
       } else {
-        pageHeight += row.height
-        pageRowList[pageNo].push(row)
+        const reduceHeight = pageHeight < height ? height : pageHeight
+        pageDom.style.height = `${reduceHeight}px`
+        pageDom.height = reduceHeight * dpr
+      }
+    } else {
+      for (let i = 0; i < this.rowList.length; i++) {
+        const row = this.rowList[i]
+        if (row.height + pageHeight > height || this.rowList[i - 1]?.isPageBreak) {
+          pageHeight = marginHeight + row.height
+          pageRowList.push([row])
+          pageNo++
+        } else {
+          pageHeight += row.height
+          pageRowList[pageNo].push(row)
+        }
       }
     }
     // 绘制元素

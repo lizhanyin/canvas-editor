@@ -2,13 +2,14 @@
 
 <p align="center"> a rich text editor by canvas</p>
 
+## tips
+
+1. The export pdf feature is available now, see [feature/pdf](https://github.com/Hufe921/canvas-editor/tree/feature/pdf)
+2. The official NPM package will be available after the release of version 1.0.0
+
 ## snapshot
 
-![image](https://github.com/Hufe921/canvas-editor/blob/main/src/assets/snapshots/main_v0.8.8.png)
-
-## tip
-
-The official NPM package will be available after the release of version 1.0.0
+![image](https://github.com/Hufe921/canvas-editor/blob/main/src/assets/snapshots/main_v0.9.2.png)
 
 ## next features
 

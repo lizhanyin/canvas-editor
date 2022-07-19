@@ -2,7 +2,7 @@ import { WRAP, ZERO } from '../../dataset/constant/Common'
 import { EDITOR_ELEMENT_STYLE_ATTR } from '../../dataset/constant/Element'
 import { defaultWatermarkOption } from '../../dataset/constant/Watermark'
 import { ControlComponent } from '../../dataset/enum/Control'
-import { EditorContext, EditorMode } from '../../dataset/enum/Editor'
+import { EditorContext, EditorMode, PageMode } from '../../dataset/enum/Editor'
 import { ElementType } from '../../dataset/enum/Element'
 import { ElementStyleKey } from '../../dataset/enum/ElementStyle'
 import { RowFlex } from '../../dataset/enum/Row'
@@ -13,7 +13,7 @@ import { IColgroup } from '../../interface/table/Colgroup'
 import { ITd } from '../../interface/table/Td'
 import { ITr } from '../../interface/table/Tr'
 import { IWatermark } from '../../interface/Watermark'
-import { getUUID } from '../../utils'
+import { downloadFile, getUUID } from '../../utils'
 import { formatElementList } from '../../utils/element'
 import { printImageBase64 } from '../../utils/print'
 import { Control } from '../draw/control/Control'
@@ -23,6 +23,7 @@ import { CanvasEvent } from '../event/CanvasEvent'
 import { HistoryManager } from '../history/HistoryManager'
 import { Position } from '../position/Position'
 import { RangeManager } from '../range/RangeManager'
+import { WorkerManager } from '../worker/WorkerManager'
 
 
 export class CommandAdapt {
@@ -37,6 +38,7 @@ export class CommandAdapt {
   private tableTool: TableTool
   private options: Required<IEditorOption>
   private control: Control
+  private workerManager: WorkerManager
 
   constructor(draw: Draw) {
     this.draw = draw
@@ -47,6 +49,7 @@ export class CommandAdapt {
     this.tableTool = draw.getTableTool()
     this.options = draw.getOptions()
     this.control = draw.getControl()
+    this.workerManager = draw.getWorkerManager()
   }
 
   public mode(payload: EditorMode) {
@@ -1010,6 +1013,79 @@ export class CommandAdapt {
     this.draw.render({ curIndex })
   }
 
+  public getHyperlinkRange(): [number, number] | null {
+    let leftIndex = -1
+    let rightIndex = -1
+    const { startIndex, endIndex } = this.range.getRange()
+    if (!~startIndex && !~endIndex) return null
+    const elementList = this.draw.getElementList()
+    const startElement = elementList[startIndex]
+    if (startElement.type !== ElementType.HYPERLINK) return null
+    // 向左查找
+    let preIndex = startIndex
+    while (preIndex > 0) {
+      const preElement = elementList[preIndex]
+      if (preElement.hyperlinkId !== startElement.hyperlinkId) {
+        leftIndex = preIndex
+        break
+      }
+      preIndex--
+    }
+    // 向右查找
+    let nextIndex = startIndex + 1
+    while (nextIndex < elementList.length) {
+      const nextElement = elementList[nextIndex]
+      if (nextElement.hyperlinkId !== startElement.hyperlinkId) {
+        rightIndex = nextIndex - 1
+        break
+      }
+      nextIndex++
+    }
+    // 控件在最后
+    if (nextIndex === elementList.length) {
+      rightIndex = nextIndex - 1
+    }
+    if (!~leftIndex || !~rightIndex) return null
+    return [leftIndex, rightIndex]
+  }
+
+  public deleteHyperlink() {
+    // 获取超链接索引
+    const hyperRange = this.getHyperlinkRange()
+    if (!hyperRange) return
+    const elementList = this.draw.getElementList()
+    const [leftIndex, rightIndex] = hyperRange
+    // 删除元素
+    elementList.splice(leftIndex + 1, rightIndex - leftIndex)
+    // 重置画布
+    this.range.setRange(leftIndex, leftIndex)
+    this.draw.render({
+      curIndex: leftIndex
+    })
+  }
+
+  public cancelHyperlink() {
+    // 获取超链接索引
+    const hyperRange = this.getHyperlinkRange()
+    if (!hyperRange) return
+    const elementList = this.draw.getElementList()
+    const [leftIndex, rightIndex] = hyperRange
+    // 删除属性
+    for (let i = leftIndex; i <= rightIndex; i++) {
+      const element = elementList[i]
+      delete element.type
+      delete element.url
+      delete element.hyperlinkId
+      delete element.underline
+    }
+    // 重置画布
+    const { endIndex } = this.range.getRange()
+    this.draw.render({
+      curIndex: endIndex,
+      isComputeRowList: false
+    })
+  }
+
   public separator(payload: number[]) {
     const isReadonly = this.draw.isReadonly()
     if (isReadonly) return
@@ -1235,12 +1311,41 @@ export class CommandAdapt {
     }
   }
 
+  public replaceImageElement(payload: string) {
+    const { startIndex } = this.range.getRange()
+    const elementList = this.draw.getElementList()
+    const element = elementList[startIndex]
+    if (!element || element.type !== ElementType.IMAGE) return
+    // 替换图片
+    element.id = getUUID()
+    element.value = payload
+    this.draw.render({
+      isSetCursor: false
+    })
+  }
+
+  public saveAsImageElement() {
+    const { startIndex } = this.range.getRange()
+    const elementList = this.draw.getElementList()
+    const element = elementList[startIndex]
+    if (!element || element.type !== ElementType.IMAGE) return
+    downloadFile(element.value, `${element.id!}.png`)
+  }
+
   public getImage(): string[] {
     return this.draw.getDataURL()
   }
 
   public getValue(): IEditorResult {
     return this.draw.getValue()
+  }
+
+  public getWordCount(): Promise<number> {
+    return this.workerManager.getWordCount()
+  }
+
+  public pageMode(payload: PageMode) {
+    this.draw.setPageMode(payload)
   }
 
   public pageScaleRecovery() {
@@ -1271,6 +1376,22 @@ export class CommandAdapt {
     const isReadonly = this.draw.isReadonly()
     if (isReadonly) return
     this.draw.insertElementList(payload)
+  }
+
+  public removeControl() {
+    const { startIndex, endIndex } = this.range.getRange()
+    if (startIndex !== endIndex) return
+    const elementList = this.draw.getElementList()
+    const element = elementList[startIndex]
+    if (element.type !== ElementType.CONTROL) return
+    // 删除控件
+    const control = this.draw.getControl()
+    const newIndex = control.removeControl(startIndex)
+    // 重新渲染
+    this.range.setRange(newIndex, newIndex)
+    this.draw.render({
+      curIndex: newIndex
+    })
   }
 
 }

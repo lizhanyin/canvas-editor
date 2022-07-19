@@ -6,6 +6,11 @@ import { Command } from '../command/Command'
 import { Draw } from '../draw/Draw'
 import { Position } from '../position/Position'
 import { RangeManager } from '../range/RangeManager'
+import { controlMenus } from './menus/controlMenus'
+import { globalMenus } from './menus/globalMenus'
+import { hyperlinkMenus } from './menus/hyperlinkMenus'
+import { imageMenus } from './menus/imageMenus'
+import { tableMenus } from './menus/tableMenus'
 
 interface IRenderPayload {
   contextMenuList: IRegisterContextMenu[];
@@ -31,7 +36,14 @@ export class ContextMenu {
     this.range = draw.getRange()
     this.position = draw.getPosition()
     this.container = draw.getContainer()
-    this.contextMenuList = []
+    // 内部菜单
+    this.contextMenuList = [
+      ...globalMenus,
+      ...tableMenus,
+      ...imageMenus,
+      ...controlMenus,
+      ...hyperlinkMenus
+    ]
     this.contextMenuContainerList = []
     this.contextMenuRelationShip = new Map()
     // 接管菜单权限
@@ -95,7 +107,14 @@ export class ContextMenu {
     const isInTable = positionContext.isTable
     // 是否存在跨行/列
     const isCrossRowCol = isInTable && !!crossRowCol
+    // 当前元素
+    const elementList = this.draw.getElementList()
+    const startElement = elementList[startIndex] || null
+    const endElement = elementList[endIndex] || null
+
     return {
+      startElement,
+      endElement,
       isReadonly,
       editorHasSelection,
       editorTextFocus,

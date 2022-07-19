@@ -9,11 +9,9 @@ import { RowFlex } from './dataset/enum/Row'
 import { ElementType } from './dataset/enum/Element'
 import { formatElementList } from './utils/element'
 import { Register } from './core/register/Register'
-import { globalMenus } from './core/contextmenu/menus/globalMenus'
 import { ContextMenu } from './core/contextmenu/ContextMenu'
-import { tableMenus } from './core/contextmenu/menus/tableMenus'
 import { IContextMenuContext, IRegisterContextMenu } from './interface/contextmenu/ContextMenu'
-import { EditorComponent, EditorMode } from './dataset/enum/Editor'
+import { EditorComponent, EditorMode, PageMode } from './dataset/enum/Editor'
 import { EDITOR_COMPONENT } from './dataset/constant/Editor'
 import { IHeader } from './interface/Header'
 import { IWatermark } from './interface/Watermark'
@@ -51,7 +49,7 @@ export default class Editor {
     }
 
     const editorOptions: DeepRequired<IEditorOption> = {
-      defaultMode: EditorMode.EDIT,
+      mode: EditorMode.EDIT,
       defaultType: 'TEXT',
       defaultFont: 'Yahei',
       defaultSize: 16,
@@ -77,6 +75,7 @@ export default class Editor {
       marginIndicatorSize: 35,
       marginIndicatorColor: '#BABABA',
       margins: [100, 120, 100, 120],
+      pageMode: PageMode.PAGING,
       tdPadding: 5,
       defaultTdHeight: 40,
       defaultHyperlinkColor: '#0000FF',
@@ -102,8 +101,6 @@ export default class Editor {
     this.register = new Register({
       contextMenu
     })
-    this.register.contextMenuList(globalMenus)
-    this.register.contextMenuList(tableMenus)
   }
 
 }
@@ -116,7 +113,8 @@ export {
   ElementType,
   ControlType,
   EditorComponent,
-  EDITOR_COMPONENT
+  EDITOR_COMPONENT,
+  PageMode
 }
 
 // 对外类型

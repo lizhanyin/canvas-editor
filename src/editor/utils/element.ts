@@ -1,5 +1,6 @@
-import { deepClone, getUUID } from '.'
+import { deepClone, getUUID, splitText } from '.'
 import { ElementType, IEditorOption, IElement } from '..'
+import { LaTexParticle } from '../core/draw/particle/latex/LaTexParticle'
 import { defaultCheckboxOption } from '../dataset/constant/Checkbox'
 import { ZERO } from '../dataset/constant/Common'
 import { defaultControlOption } from '../dataset/constant/Control'
@@ -55,7 +56,7 @@ export function formatElementList(elementList: IElement[], options: IFormatEleme
         // 元素展开
         if (valueList[0].value.length > 1) {
           const deleteValue = valueList.splice(0, 1)[0]
-          const deleteTextList = deleteValue.value.split('')
+          const deleteTextList = splitText(deleteValue.value)
           for (let d = 0; d < deleteTextList.length; d++) {
             valueList.splice(d, 0, { ...deleteValue, value: deleteTextList[d] })
           }
@@ -82,7 +83,7 @@ export function formatElementList(elementList: IElement[], options: IFormatEleme
         thePrePostfixArgs.color = editorOptions.control.bracketColor
       }
       // 前缀
-      const prefixStrList = (prefix || defaultControlOption.prefix).split('')
+      const prefixStrList = splitText(prefix || defaultControlOption.prefix)
       for (let p = 0; p < prefixStrList.length; p++) {
         const value = prefixStrList[p]
         elementList.splice(i, 0, {
@@ -121,7 +122,7 @@ export function formatElementList(elementList: IElement[], options: IFormatEleme
               })
               i++
               // 文本
-              const valueStrList = valueSet.value.split('')
+              const valueStrList = splitText(valueSet.value)
               for (let e = 0; e < valueStrList.length; e++) {
                 const value = valueStrList[e]
                 const isLastLetter = e === valueStrList.length - 1
@@ -150,7 +151,7 @@ export function formatElementList(elementList: IElement[], options: IFormatEleme
           }
           for (let v = 0; v < valueList.length; v++) {
             const element = valueList[v]
-            const valueStrList = element.value.split('')
+            const valueStrList = splitText(element.value)
             for (let e = 0; e < valueStrList.length; e++) {
               const value = valueStrList[e]
               elementList.splice(i, 0, {
@@ -171,7 +172,7 @@ export function formatElementList(elementList: IElement[], options: IFormatEleme
         if (editorOptions && editorOptions.control) {
           thePlaceholderArgs.color = editorOptions.control.placeholderColor
         }
-        const placeholderStrList = placeholder.split('')
+        const placeholderStrList = splitText(placeholder)
         for (let p = 0; p < placeholderStrList.length; p++) {
           const value = placeholderStrList[p]
           elementList.splice(i, 0, {
@@ -186,7 +187,7 @@ export function formatElementList(elementList: IElement[], options: IFormatEleme
         }
       }
       // 后缀
-      const postfixStrList = (postfix || defaultControlOption.postfix).split('')
+      const postfixStrList = splitText(postfix || defaultControlOption.postfix)
       for (let p = 0; p < postfixStrList.length; p++) {
         const value = postfixStrList[p]
         elementList.splice(i, 0, {
@@ -202,7 +203,7 @@ export function formatElementList(elementList: IElement[], options: IFormatEleme
       i--
     } else if ((!el.type || el.type === ElementType.TEXT) && el.value.length > 1) {
       elementList.splice(i, 1)
-      const valueList = el.value.split('')
+      const valueList = splitText(el.value)
       for (let v = 0; v < valueList.length; v++) {
         elementList.splice(i + v, 0, { ...el, value: valueList[v] })
       }
@@ -212,6 +213,13 @@ export function formatElementList(elementList: IElement[], options: IFormatEleme
       el.value = ZERO
     }
     if (el.type === ElementType.IMAGE) {
+      el.id = getUUID()
+    }
+    if (el.type === ElementType.LATEX) {
+      const { svg, width, height } = LaTexParticle.convertLaTextToSVG(el.value)
+      el.width = el.width || width
+      el.height = el.height || height
+      el.laTexSVG = svg
       el.id = getUUID()
     }
     i++
@@ -330,7 +338,8 @@ export function zipElementList(payload: IElement[]): IElement[] {
           nextElement
           && isSameElementExceptValue(pickElement, pickElementAttr(nextElement))
         ) {
-          pickElement.value += nextElement.value
+          const nextValue = nextElement.value === ZERO ? '\n' : nextElement.value
+          pickElement.value += nextValue
         } else {
           break
         }

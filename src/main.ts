@@ -1,7 +1,7 @@
 import { data, options } from './mock'
 import './style.css'
 import prism from 'prismjs'
-import Editor, { ControlType, EditorMode, ElementType, IElement } from './editor'
+import Editor, { ControlType, EditorMode, ElementType, IElement, PageMode } from './editor'
 import { Dialog } from './components/dialog/Dialog'
 import { formatPrismToken } from './utils/prism'
 
@@ -106,8 +106,8 @@ window.onload = function () {
   }
 
   const colorControlDom = document.querySelector<HTMLInputElement>('#color')!
-  colorControlDom.onchange = function () {
-    instance.command.executeColor(colorControlDom!.value)
+  colorControlDom.oninput = function () {
+    instance.command.executeColor(colorControlDom.value)
   }
   const colorDom = document.querySelector<HTMLDivElement>('.menu-item__color')!
   const colorSpanDom = colorDom.querySelector('span')!
@@ -117,7 +117,7 @@ window.onload = function () {
   }
 
   const highlightControlDom = document.querySelector<HTMLInputElement>('#highlight')!
-  highlightControlDom.onchange = function () {
+  highlightControlDom.oninput = function () {
     instance.command.executeHighlight(highlightControlDom.value)
   }
   const highlightDom = document.querySelector<HTMLDivElement>('.menu-item__highlight')!
@@ -156,7 +156,7 @@ window.onload = function () {
     instance.command.executeRowMargin(Number(li.dataset.rowmargin!))
   }
 
-  // 4. | 表格 | 图片 | 超链接 | 分割线 | 水印 | 代码块 | 分隔符 |
+  // 4. | 表格 | 图片 | 超链接 | 分割线 | 水印 | 代码块 | 分隔符 | 控件 | 复选框 | LaTeX
   const tableDom = document.querySelector<HTMLDivElement>('.menu-item__table')!
   const tablePanelContainer = document.querySelector<HTMLDivElement>('.menu-item__table__collapse')!
   const tableClose = document.querySelector<HTMLDivElement>('.table-close')!
@@ -541,6 +541,28 @@ window.onload = function () {
     }])
   }
 
+  const latexDom = document.querySelector<HTMLDivElement>('.menu-item__latex')!
+  latexDom.onclick = function () {
+    console.log('LaTeX')
+    new Dialog({
+      title: 'LaTeX',
+      data: [{
+        type: 'textarea',
+        height: 100,
+        name: 'value',
+        placeholder: '请输入LaTeX文本'
+      }],
+      onConfirm: (payload) => {
+        const value = payload.find(p => p.name === 'value')?.value
+        if (!value) return
+        instance.command.executeInsertElementList([{
+          type: ElementType.LATEX,
+          value
+        }])
+      }
+    })
+  }
+
   // 5. | 搜索&替换 | 打印 |
   const searchCollapseDom = document.querySelector<HTMLDivElement>('.menu-item__search__collapse')!
   const searchInputDom = document.querySelector<HTMLInputElement>('.menu-item__search__collapse__search input')!
@@ -586,7 +608,17 @@ window.onload = function () {
     instance.command.executePrint()
   }
 
-  // 6. 纸张缩放
+  // 6. 页面模式 | 纸张缩放
+  const pageModeDom = document.querySelector<HTMLDivElement>('.page-mode')!
+  const pageModeOptionsDom = pageModeDom.querySelector<HTMLDivElement>('.options')!
+  pageModeDom.onclick = function () {
+    pageModeOptionsDom.classList.toggle('visible')
+  }
+  pageModeOptionsDom.onclick = function (evt) {
+    const li = evt.target as HTMLLIElement
+    instance.command.executePageMode(<PageMode>li.dataset.pageMode!)
+  }
+
   document.querySelector<HTMLDivElement>('.page-scale-percentage')!.onclick = function () {
     console.log('page-scale-recovery')
     instance.command.executePageScaleRecovery()
@@ -736,6 +768,17 @@ window.onload = function () {
       const menuDom = document.querySelector<HTMLDivElement>(`.menu-item__${menu}`)!
       payload ? menuDom.classList.add('disable') : menuDom.classList.remove('disable')
     })
+  }
+
+  instance.listener.pageModeChange = function (payload) {
+    const activeMode = pageModeOptionsDom.querySelector<HTMLLIElement>(`[data-page-mode='${payload}']`)!
+    pageModeOptionsDom.querySelectorAll('li').forEach(li => li.classList.remove('active'))
+    activeMode.classList.add('active')
+  }
+
+  instance.listener.contentChange = async function () {
+    const wordCount = await instance.command.getWordCount()
+    document.querySelector<HTMLSpanElement>('.word-count')!.innerText = `${wordCount || 0}`
   }
 
   instance.listener.saved = function (payload) {
