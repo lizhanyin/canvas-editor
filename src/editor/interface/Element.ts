@@ -1,6 +1,7 @@
-import { ControlComponent } from '../dataset/enum/Control'
+import { ControlComponent, ImageDisplay } from '../dataset/enum/Control'
 import { ElementType } from '../dataset/enum/Element'
 import { RowFlex } from '../dataset/enum/Row'
+import { IBlock } from './Block'
 import { ICheckbox } from './Checkbox'
 import { IControl } from './Control'
 import { IColgroup } from './table/Colgroup'
@@ -69,6 +70,19 @@ export interface ILaTexElement {
   laTexSVG?: string;
 }
 
+export interface IDateElement {
+  dateFormat?: string;
+  dateId?: string;
+}
+
+export interface IImageElement {
+  imgDisplay?: ImageDisplay
+}
+
+export interface IBlockElement {
+  block?: IBlock;
+}
+
 export type IElement = IElementBasic
   & IElementStyle
   & ITable
@@ -78,6 +92,9 @@ export type IElement = IElementBasic
   & IControlElement
   & ICheckboxElement
   & ILaTexElement
+  & IDateElement
+  & IImageElement
+  & IBlockElement
 
 export interface IElementMetrics {
   width: number;

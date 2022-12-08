@@ -1,9 +1,10 @@
 import { data, options } from './mock'
 import './style.css'
 import prism from 'prismjs'
-import Editor, { ControlType, EditorMode, ElementType, IElement, PageMode } from './editor'
+import Editor, { BlockType, Command, ControlType, EditorMode, ElementType, IBlock, IElement, KeyMap, PageMode } from './editor'
 import { Dialog } from './components/dialog/Dialog'
 import { formatPrismToken } from './utils/prism'
+import { Signature } from './components/signature/Signature'
 
 window.onload = function () {
 
@@ -145,6 +146,12 @@ window.onload = function () {
     instance.command.executeRight()
   }
 
+  const alignmentDom = document.querySelector<HTMLDivElement>('.menu-item__alignment')!
+  alignmentDom.onclick = function () {
+    console.log('alignment')
+    instance.command.executeAlignment()
+  }
+
   const rowMarginDom = document.querySelector<HTMLDivElement>('.menu-item__row-margin')!
   const rowOptionDom = rowMarginDom.querySelector<HTMLDivElement>('.options')!
   rowMarginDom.onclick = function () {
@@ -156,7 +163,7 @@ window.onload = function () {
     instance.command.executeRowMargin(Number(li.dataset.rowmargin!))
   }
 
-  // 4. | 表格 | 图片 | 超链接 | 分割线 | 水印 | 代码块 | 分隔符 | 控件 | 复选框 | LaTeX
+  // 4. | 表格 | 图片 | 超链接 | 分割线 | 水印 | 代码块 | 分隔符 | 控件 | 复选框 | LaTeX | 日期选择器
   const tableDom = document.querySelector<HTMLDivElement>('.menu-item__table')!
   const tablePanelContainer = document.querySelector<HTMLDivElement>('.menu-item__table__collapse')!
   const tableClose = document.querySelector<HTMLDivElement>('.table-close')!
@@ -266,11 +273,13 @@ window.onload = function () {
         type: 'text',
         label: '文本',
         name: 'name',
+        required: true,
         placeholder: '请输入文本'
       }, {
         type: 'text',
         label: '链接',
         name: 'url',
+        required: true,
         placeholder: '请输入链接'
       }],
       onConfirm: (payload) => {
@@ -333,16 +342,19 @@ window.onload = function () {
           type: 'text',
           label: '内容',
           name: 'data',
+          required: true,
           placeholder: '请输入内容'
         }, {
           type: 'color',
           label: '颜色',
           name: 'color',
+          required: true,
           value: '#AEB5C0'
         }, {
           type: 'number',
           label: '字体大小',
           name: 'size',
+          required: true,
           value: '120'
         }],
         onConfirm: (payload) => {
@@ -428,6 +440,7 @@ window.onload = function () {
             type: 'text',
             label: '占位符',
             name: 'placeholder',
+            required: true,
             placeholder: '请输入占位符'
           }, {
             type: 'text',
@@ -462,6 +475,7 @@ window.onload = function () {
             type: 'text',
             label: '占位符',
             name: 'placeholder',
+            required: true,
             placeholder: '请输入占位符'
           }, {
             type: 'text',
@@ -472,6 +486,7 @@ window.onload = function () {
             type: 'textarea',
             label: '值集',
             name: 'valueSets',
+            required: true,
             height: 100,
             placeholder: `请输入值集JSON，例：\n[{\n"value":"有",\n"code":"98175"\n}]`
           }],
@@ -507,6 +522,7 @@ window.onload = function () {
             type: 'textarea',
             label: '值集',
             name: 'valueSets',
+            required: true,
             height: 100,
             placeholder: `请输入值集JSON，例：\n[{\n"value":"有",\n"code":"98175"\n}]`
           }],
@@ -563,11 +579,134 @@ window.onload = function () {
     })
   }
 
+  const dateDom = document.querySelector<HTMLDivElement>('.menu-item__date')!
+  const dateDomOptionDom = dateDom.querySelector<HTMLDivElement>('.options')!
+  dateDom.onclick = function () {
+    console.log('date')
+    dateDomOptionDom.classList.toggle('visible')
+    // 定位调整
+    const bodyRect = document.body.getBoundingClientRect()
+    const dateDomOptionRect = dateDomOptionDom.getBoundingClientRect()
+    if (dateDomOptionRect.left + dateDomOptionRect.width > bodyRect.width) {
+      dateDomOptionDom.style.right = '0px'
+      dateDomOptionDom.style.left = 'unset'
+    } else {
+      dateDomOptionDom.style.right = 'unset'
+      dateDomOptionDom.style.left = '0px'
+    }
+    // 当前日期
+    const date = new Date()
+    const year = date.getFullYear().toString()
+    const month = (date.getMonth() + 1).toString().padStart(2, '0')
+    const day = date.getDate().toString().padStart(2, '0')
+    const hour = date.getHours().toString().padStart(2, '0')
+    const minute = date.getMinutes().toString().padStart(2, '0')
+    const second = date.getSeconds().toString().padStart(2, '0')
+    const dateString = `${year}-${month}-${day}`
+    const dateTimeString = `${dateString} ${hour}:${minute}:${second}`
+    dateDomOptionDom.querySelector<HTMLLIElement>('li:first-child')!.innerText = dateString
+    dateDomOptionDom.querySelector<HTMLLIElement>('li:last-child')!.innerText = dateTimeString
+  }
+  dateDomOptionDom.onmousedown = function (evt) {
+    const li = evt.target as HTMLLIElement
+    const dateFormat = li.dataset.format!
+    dateDomOptionDom.classList.toggle('visible')
+    instance.command.executeInsertElementList([{
+      type: ElementType.DATE,
+      value: '',
+      dateFormat,
+      valueList: [{
+        value: li.innerText.trim(),
+      }]
+    }])
+  }
+
+  const blockDom = document.querySelector<HTMLDivElement>('.menu-item__block')!
+  blockDom.onclick = function () {
+    console.log('block')
+    new Dialog({
+      title: '内容块',
+      data: [{
+        type: 'select',
+        label: '类型',
+        name: 'type',
+        value: 'iframe',
+        required: true,
+        options: [{
+          label: '网址',
+          value: 'iframe'
+        }, {
+          label: '视频',
+          value: 'video'
+        }]
+      }, {
+        type: 'number',
+        label: '宽度',
+        name: 'width',
+        placeholder: '请输入宽度（默认页面内宽度）'
+      }, {
+        type: 'number',
+        label: '高度',
+        name: 'height',
+        required: true,
+        placeholder: '请输入高度'
+      }, {
+        type: 'textarea',
+        label: '地址',
+        height: 100,
+        name: 'value',
+        required: true,
+        placeholder: '请输入地址'
+      }],
+      onConfirm: (payload) => {
+        const type = payload.find(p => p.name === 'type')?.value
+        if (!type) return
+        const value = payload.find(p => p.name === 'value')?.value
+        if (!value) return
+        const width = payload.find(p => p.name === 'width')?.value
+        const height = payload.find(p => p.name === 'height')?.value
+        if (!height) return
+        const block: IBlock = {
+          type: <BlockType>type
+        }
+        if (block.type === BlockType.IFRAME) {
+          block.iframeBlock = {
+            src: value
+          }
+        } else if (block.type === BlockType.VIDEO) {
+          block.videoBlock = {
+            src: value
+          }
+        }
+        const blockElement: IElement = {
+          type: ElementType.BLOCK,
+          value: '',
+          height: Number(height),
+          block
+        }
+        if (width) {
+          blockElement.width = Number(width)
+        }
+        instance.command.executeInsertElementList([blockElement])
+      }
+    })
+  }
+
   // 5. | 搜索&替换 | 打印 |
   const searchCollapseDom = document.querySelector<HTMLDivElement>('.menu-item__search__collapse')!
   const searchInputDom = document.querySelector<HTMLInputElement>('.menu-item__search__collapse__search input')!
   const replaceInputDom = document.querySelector<HTMLInputElement>('.menu-item__search__collapse__replace input')!
   const searchDom = document.querySelector<HTMLDivElement>('.menu-item__search')!
+  const searchResultDom = searchCollapseDom.querySelector<HTMLLabelElement>('.search-result')!
+  function setSearchResult() {
+    const result = instance.command.getSearchNavigateInfo()
+    if (result) {
+      const { index, count } = result
+      searchResultDom.innerText = `${index}/${count}`
+    } else {
+      searchResultDom.innerText = ''
+    }
+  }
   searchDom.onclick = function () {
     console.log('search')
     searchCollapseDom.style.display = 'block'
@@ -580,19 +719,23 @@ window.onload = function () {
     } else {
       searchCollapseDom.style.right = 'unset'
     }
+    searchInputDom.focus()
   }
   searchCollapseDom.querySelector<HTMLSpanElement>('span')!.onclick = function () {
     searchCollapseDom.style.display = 'none'
     searchInputDom.value = ''
     replaceInputDom.value = ''
     instance.command.executeSearch(null)
+    setSearchResult()
   }
   searchInputDom.oninput = function () {
     instance.command.executeSearch(searchInputDom.value || null)
+    setSearchResult()
   }
   searchInputDom.onkeydown = function (evt) {
     if (evt.key === 'Enter') {
       instance.command.executeSearch(searchInputDom.value || null)
+      setSearchResult()
     }
   }
   searchCollapseDom.querySelector<HTMLButtonElement>('button')!.onclick = function () {
@@ -602,13 +745,21 @@ window.onload = function () {
       instance.command.executeReplace(replaceValue)
     }
   }
+  searchCollapseDom.querySelector<HTMLDivElement>('.arrow-left')!.onclick = function () {
+    instance.command.executeSearchNavigatePre()
+    setSearchResult()
+  }
+  searchCollapseDom.querySelector<HTMLDivElement>('.arrow-right')!.onclick = function () {
+    instance.command.executeSearchNavigateNext()
+    setSearchResult()
+  }
 
   document.querySelector<HTMLDivElement>('.menu-item__print')!.onclick = function () {
     console.log('print')
     instance.command.executePrint()
   }
 
-  // 6. 页面模式 | 纸张缩放
+  // 6. 页面模式 | 纸张缩放 | 全屏
   const pageModeDom = document.querySelector<HTMLDivElement>('.page-mode')!
   const pageModeOptionsDom = pageModeDom.querySelector<HTMLDivElement>('.options')!
   pageModeDom.onclick = function () {
@@ -632,6 +783,98 @@ window.onload = function () {
   document.querySelector<HTMLDivElement>('.page-scale-add')!.onclick = function () {
     console.log('page-scale-add')
     instance.command.executePageScaleAdd()
+  }
+
+  // 纸张大小
+  const paperSizeDom = document.querySelector<HTMLDivElement>('.paper-size')!
+  const paperSizeDomOptionsDom = paperSizeDom.querySelector<HTMLDivElement>('.options')!
+  paperSizeDom.onclick = function () {
+    paperSizeDomOptionsDom.classList.toggle('visible')
+  }
+  paperSizeDomOptionsDom.onclick = function (evt) {
+    const li = evt.target as HTMLLIElement
+    const paperType = li.dataset.paperSize!
+    const [width, height] = paperType.split('*').map(Number)
+    instance.command.executePaperSize(width, height)
+    // 纸张状态回显
+    paperSizeDomOptionsDom.querySelectorAll('li')
+      .forEach(child => child.classList.remove('active'))
+    li.classList.add('active')
+  }
+
+  // 页面边距
+  const paperMarginDom = document.querySelector<HTMLDivElement>('.paper-margin')!
+  paperMarginDom.onclick = function () {
+    const [topMargin, rightMargin, bottomMargin, leftMargin] = instance.command.getPaperMargin()
+    new Dialog({
+      title: '页边距',
+      data: [{
+        type: 'text',
+        label: '上边距',
+        name: 'top',
+        required: true,
+        value: `${topMargin}`,
+        placeholder: '请输入上边距'
+      }, {
+        type: 'text',
+        label: '下边距',
+        name: 'bottom',
+        required: true,
+        value: `${bottomMargin}`,
+        placeholder: '请输入下边距'
+      }, {
+        type: 'text',
+        label: '左边距',
+        name: 'left',
+        required: true,
+        value: `${leftMargin}`,
+        placeholder: '请输入左边距'
+      }, {
+        type: 'text',
+        label: '右边距',
+        name: 'right',
+        required: true,
+        value: `${rightMargin}`,
+        placeholder: '请输入右边距'
+      }],
+      onConfirm: (payload) => {
+        const top = payload.find(p => p.name === 'top')?.value
+        if (!top) return
+        const bottom = payload.find(p => p.name === 'bottom')?.value
+        if (!bottom) return
+        const left = payload.find(p => p.name === 'left')?.value
+        if (!left) return
+        const right = payload.find(p => p.name === 'right')?.value
+        if (!right) return
+        instance.command.executeSetPaperMargin([
+          Number(top),
+          Number(right),
+          Number(bottom),
+          Number(left)
+        ])
+      }
+    })
+  }
+
+  // 全屏
+  const fullscreenDom = document.querySelector<HTMLDivElement>('.fullscreen')!
+  fullscreenDom.onclick = toggleFullscreen
+  window.addEventListener('keydown', (evt) => {
+    if (evt.key === 'F11') {
+      toggleFullscreen()
+      evt.preventDefault()
+    }
+  })
+  document.addEventListener('fullscreenchange', () => {
+    fullscreenDom.classList.toggle('exist')
+  })
+  function toggleFullscreen() {
+    console.log('fullscreen')
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen()
+    } else {
+      document.exitFullscreen()
+    }
   }
 
   // 7. 编辑器使用模式
@@ -714,10 +957,13 @@ window.onload = function () {
     leftDom.classList.remove('active')
     centerDom.classList.remove('active')
     rightDom.classList.remove('active')
+    alignmentDom.classList.remove('active')
     if (payload.rowFlex && payload.rowFlex === 'right') {
       rightDom.classList.add('active')
     } else if (payload.rowFlex && payload.rowFlex === 'center') {
       centerDom.classList.add('active')
+    } else if (payload.rowFlex && payload.rowFlex === 'alignment') {
+      alignmentDom.classList.add('active')
     } else {
       leftDom.classList.add('active')
     }
@@ -784,5 +1030,75 @@ window.onload = function () {
   instance.listener.saved = function (payload) {
     console.log('elementList: ', payload)
   }
+
+  // 9. 右键菜单注册
+  instance.register.contextMenuList([
+    {
+      name: '签名',
+      icon: 'signature',
+      when: (payload) => {
+        return !payload.isReadonly && payload.editorTextFocus
+      },
+      callback: (command: Command) => {
+        new Signature({
+          onConfirm(payload) {
+            if (!payload) return
+            const { value, width, height } = payload
+            if (!value || !width || !height) return
+            command.executeInsertElementList([{
+              value,
+              width,
+              height,
+              type: ElementType.IMAGE
+            }])
+          }
+        })
+      }
+    }
+  ])
+
+  // 10. 快捷键注册
+  instance.register.shortcutList([
+    {
+      key: KeyMap.P,
+      ctrl: true,
+      isGlobal: true,
+      callback: (command: Command) => {
+        command.executePrint()
+      }
+    },
+    {
+      key: KeyMap.F,
+      ctrl: true,
+      isGlobal: true,
+      callback: () => {
+        searchDom.click()
+      }
+    },
+    {
+      key: KeyMap.MINUS,
+      ctrl: true,
+      isGlobal: true,
+      callback: (command: Command) => {
+        command.executePageScaleMinus()
+      }
+    },
+    {
+      key: KeyMap.EQUAL,
+      ctrl: true,
+      isGlobal: true,
+      callback: (command: Command) => {
+        command.executePageScaleAdd()
+      }
+    },
+    {
+      key: KeyMap.ZERO,
+      ctrl: true,
+      isGlobal: true,
+      callback: (command: Command) => {
+        command.executePageScaleRecovery()
+      }
+    }
+  ])
 
 }

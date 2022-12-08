@@ -9,10 +9,10 @@ import { ControlComponent, ControlType } from '../dataset/enum/Control'
 
 interface IFormatElementListOption {
   isHandleFirstElement?: boolean;
-  editorOptions?: Required<IEditorOption>;
+  editorOptions: Required<IEditorOption>;
 }
 
-export function formatElementList(elementList: IElement[], options: IFormatElementListOption = {}) {
+export function formatElementList(elementList: IElement[], options: IFormatElementListOption) {
   const { isHandleFirstElement, editorOptions } = <IFormatElementListOption>{
     isHandleFirstElement: true,
     ...options
@@ -67,6 +67,31 @@ export function formatElementList(elementList: IElement[], options: IFormatEleme
           value.type = el.type
           value.url = el.url
           value.hyperlinkId = hyperlinkId
+          elementList.splice(i, 0, value)
+          i++
+        }
+      }
+      i--
+    } else if (el.type === ElementType.DATE) {
+      const valueList = el.valueList || []
+      // 移除父节点
+      elementList.splice(i, 1)
+      // 追加字节点
+      if (valueList.length) {
+        // 元素展开
+        if (valueList[0].value.length > 1) {
+          const deleteValue = valueList.splice(0, 1)[0]
+          const deleteTextList = splitText(deleteValue.value)
+          for (let d = 0; d < deleteTextList.length; d++) {
+            valueList.splice(d, 0, { ...deleteValue, value: deleteTextList[d] })
+          }
+        }
+        const dateId = getUUID()
+        for (let v = 0; v < valueList.length; v++) {
+          const value = valueList[v]
+          value.type = el.type
+          value.dateFormat = el.dateFormat
+          value.dateId = dateId
           elementList.splice(i, 0, value)
           i++
         }
@@ -212,7 +237,7 @@ export function formatElementList(elementList: IElement[], options: IFormatEleme
     if (el.value === '\n') {
       el.value = ZERO
     }
-    if (el.type === ElementType.IMAGE) {
+    if (el.type === ElementType.IMAGE || el.type === ElementType.BLOCK) {
       el.id = getUUID()
     }
     if (el.type === ElementType.LATEX) {
@@ -302,6 +327,27 @@ export function zipElementList(payload: IElement[]): IElement[] {
       }
       hyperlinkElement.valueList = zipElementList(valueList)
       element = hyperlinkElement
+    } else if (element.type === ElementType.DATE) {
+      const dateId = element.dateId
+      const dateElement: IElement = {
+        type: ElementType.DATE,
+        value: '',
+        dateFormat: element.dateFormat
+      }
+      const valueList: IElement[] = []
+      while (e < elementList.length) {
+        const dateE = elementList[e]
+        if (dateId !== dateE.dateId) {
+          e--
+          break
+        }
+        delete dateE.type
+        delete dateE.dateFormat
+        valueList.push(dateE)
+        e++
+      }
+      dateElement.valueList = zipElementList(valueList)
+      element = dateElement
     } else if (element.type === ElementType.CONTROL) {
       // 控件处理
       const controlId = element.controlId

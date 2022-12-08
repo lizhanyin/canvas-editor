@@ -3,6 +3,7 @@ import { EditorMode, PageMode } from '../dataset/enum/Editor'
 import { ICheckboxOption } from './Checkbox'
 import { IControlOption } from './Control'
 import { IHeader } from './Header'
+import { IMargin } from './Margin'
 import { IWatermark } from './Watermark'
 
 export interface IEditorOption {
@@ -12,6 +13,7 @@ export interface IEditorOption {
   defaultSize?: number;
   defaultBasicRowMarginHeight?: number;
   defaultRowMargin?: number;
+  defaultTabWidth?: number;
   width?: number;
   height?: number;
   scale?: number;
@@ -25,13 +27,14 @@ export interface IEditorOption {
   rangeAlpha?: number;
   rangeMinWidth?: number;
   searchMatchColor?: string;
+  searchNavigateMatchColor?: string;
   searchMatchAlpha?: number;
   highlightAlpha?: number;
   resizerColor?: string;
   resizerSize?: number;
   marginIndicatorSize?: number;
   marginIndicatorColor?: string,
-  margins?: [top: number, right: number, bottom: number, left: number],
+  margins?: IMargin,
   pageMode?: PageMode;
   tdPadding?: number;
   defaultTdHeight?: number;
@@ -47,7 +50,8 @@ export interface IEditorResult {
   version: string;
   width: number;
   height: number;
-  margins: [top: number, right: number, bottom: number, left: number];
+  margins: IMargin;
+  header?: IHeader;
   watermark?: IWatermark;
   data: IElement[];
 }

@@ -1,73 +1,83 @@
-import { IElement } from '../..'
+import { IElement, ImageDisplay, INavigateInfo } from '../..'
 import { EditorMode, PageMode } from '../../dataset/enum/Editor'
 import { RowFlex } from '../../dataset/enum/Row'
 import { IDrawImagePayload, IPainterOptions } from '../../interface/Draw'
 import { IEditorResult } from '../../interface/Editor'
+import { IMargin } from '../../interface/Margin'
 import { IWatermark } from '../../interface/Watermark'
 import { CommandAdapt } from './CommandAdapt'
 
-
 export class Command {
 
-  private static mode: Function
-  private static cut: Function
-  private static copy: Function
-  private static paste: Function
-  private static selectAll: Function
-  private static backspace: Function
-  private static setRange: Function
-  private static undo: Function
-  private static redo: Function
-  private static painter: Function
-  private static applyPainterStyle: Function
-  private static format: Function
-  private static font: Function
-  private static sizeAdd: Function
-  private static sizeMinus: Function
-  private static bold: Function
-  private static italic: Function
-  private static underline: Function
-  private static strikeout: Function
-  private static superscript: Function
-  private static subscript: Function
-  private static color: Function
-  private static highlight: Function
-  private static left: Function
-  private static center: Function
-  private static right: Function
-  private static rowMargin: Function
-  private static insertTable: Function
-  private static insertTableTopRow: Function
-  private static insertTableBottomRow: Function
-  private static insertTableLeftCol: Function
-  private static insertTableRightCol: Function
-  private static deleteTableRow: Function
-  private static deleteTableCol: Function
-  private static deleteTable: Function
-  private static mergeTableCell: Function
-  private static cancelMergeTableCell: Function
-  private static image: Function
-  private static hyperlink: Function
-  private static deleteHyperlink: Function
-  private static cancelHyperlink: Function
-  private static separator: Function
-  private static pageBreak: Function
-  private static addWatermark: Function
-  private static deleteWatermark: Function
-  private static search: Function
-  private static replace: Function
-  private static print: Function
-  private static replaceImageElement: Function
-  private static saveAsImageElement: Function
-  private static getImage: Function
-  private static getValue: Function
-  private static getWordCount: Function
-  private static pageMode: Function
-  private static pageScaleRecovery: Function
-  private static pageScaleMinus: Function
-  private static pageScaleAdd: Function
-  private static insertElementList: Function
-  private static removeControl: Function
+  private static mode: CommandAdapt['mode']
+  private static cut: CommandAdapt['cut']
+  private static copy: CommandAdapt['copy']
+  private static paste: CommandAdapt['paste']
+  private static selectAll: CommandAdapt['selectAll']
+  private static backspace: CommandAdapt['backspace']
+  private static setRange: CommandAdapt['setRange']
+  private static undo: CommandAdapt['undo']
+  private static redo: CommandAdapt['redo']
+  private static painter: CommandAdapt['painter']
+  private static applyPainterStyle: CommandAdapt['applyPainterStyle']
+  private static format: CommandAdapt['format']
+  private static font: CommandAdapt['font']
+  private static sizeAdd: CommandAdapt['sizeAdd']
+  private static sizeMinus: CommandAdapt['sizeMinus']
+  private static bold: CommandAdapt['bold']
+  private static italic: CommandAdapt['italic']
+  private static underline: CommandAdapt['underline']
+  private static strikeout: CommandAdapt['strikeout']
+  private static superscript: CommandAdapt['superscript']
+  private static subscript: CommandAdapt['subscript']
+  private static color: CommandAdapt['color']
+  private static highlight: CommandAdapt['highlight']
+  private static left: CommandAdapt['rowFlex']
+  private static center: CommandAdapt['rowFlex']
+  private static right: CommandAdapt['rowFlex']
+  private static alignment: CommandAdapt['rowFlex']
+  private static rowMargin: CommandAdapt['rowMargin']
+  private static insertTable: CommandAdapt['insertTable']
+  private static insertTableTopRow: CommandAdapt['insertTableTopRow']
+  private static insertTableBottomRow: CommandAdapt['insertTableBottomRow']
+  private static insertTableLeftCol: CommandAdapt['insertTableLeftCol']
+  private static insertTableRightCol: CommandAdapt['insertTableRightCol']
+  private static deleteTableRow: CommandAdapt['deleteTableRow']
+  private static deleteTableCol: CommandAdapt['deleteTableCol']
+  private static deleteTable: CommandAdapt['deleteTable']
+  private static mergeTableCell: CommandAdapt['mergeTableCell']
+  private static cancelMergeTableCell: CommandAdapt['cancelMergeTableCell']
+  private static image: CommandAdapt['image']
+  private static hyperlink: CommandAdapt['hyperlink']
+  private static deleteHyperlink: CommandAdapt['deleteHyperlink']
+  private static cancelHyperlink: CommandAdapt['cancelHyperlink']
+  private static editHyperlink: CommandAdapt['editHyperlink']
+  private static separator: CommandAdapt['separator']
+  private static pageBreak: CommandAdapt['pageBreak']
+  private static addWatermark: CommandAdapt['addWatermark']
+  private static deleteWatermark: CommandAdapt['deleteWatermark']
+  private static search: CommandAdapt['search']
+  private static searchNavigatePre: CommandAdapt['searchNavigatePre']
+  private static searchNavigateNext: CommandAdapt['searchNavigateNext']
+  private static getSearchNavigateInfo: CommandAdapt['getSearchNavigateInfo']
+  private static replace: CommandAdapt['replace']
+  private static print: CommandAdapt['print']
+  private static replaceImageElement: CommandAdapt['replaceImageElement']
+  private static saveAsImageElement: CommandAdapt['saveAsImageElement']
+  private static changeImageDisplay: CommandAdapt['changeImageDisplay']
+  private static getImage: CommandAdapt['getImage']
+  private static getValue: CommandAdapt['getValue']
+  private static getWordCount: CommandAdapt['getWordCount']
+  private static getRangeText: CommandAdapt['getRangeText']
+  private static pageMode: CommandAdapt['pageMode']
+  private static pageScaleRecovery: CommandAdapt['pageScaleRecovery']
+  private static pageScaleMinus: CommandAdapt['pageScaleMinus']
+  private static pageScaleAdd: CommandAdapt['pageScaleAdd']
+  private static paperSize: CommandAdapt['paperSize']
+  private static getPaperMargin: CommandAdapt['getPaperMargin']
+  private static setPaperMargin: CommandAdapt['setPaperMargin']
+  private static insertElementList: CommandAdapt['insertElementList']
+  private static removeControl: CommandAdapt['removeControl']
 
   constructor(adapt: CommandAdapt) {
     Command.mode = adapt.mode.bind(adapt)
@@ -96,6 +106,7 @@ export class Command {
     Command.left = adapt.rowFlex.bind(adapt)
     Command.center = adapt.rowFlex.bind(adapt)
     Command.right = adapt.rowFlex.bind(adapt)
+    Command.alignment = adapt.rowFlex.bind(adapt)
     Command.rowMargin = adapt.rowMargin.bind(adapt)
     Command.insertTable = adapt.insertTable.bind(adapt)
     Command.insertTableTopRow = adapt.insertTableTopRow.bind(adapt)
@@ -111,22 +122,31 @@ export class Command {
     Command.hyperlink = adapt.hyperlink.bind(adapt)
     Command.deleteHyperlink = adapt.deleteHyperlink.bind(adapt)
     Command.cancelHyperlink = adapt.cancelHyperlink.bind(adapt)
+    Command.editHyperlink = adapt.editHyperlink.bind(adapt)
     Command.separator = adapt.separator.bind(adapt)
     Command.pageBreak = adapt.pageBreak.bind(adapt)
     Command.addWatermark = adapt.addWatermark.bind(adapt)
     Command.deleteWatermark = adapt.deleteWatermark.bind(adapt)
     Command.search = adapt.search.bind(adapt)
+    Command.searchNavigatePre = adapt.searchNavigatePre.bind(adapt)
+    Command.searchNavigateNext = adapt.searchNavigateNext.bind(adapt)
+    Command.getSearchNavigateInfo = adapt.getSearchNavigateInfo.bind(adapt)
     Command.replace = adapt.replace.bind(adapt)
     Command.print = adapt.print.bind(adapt)
     Command.replaceImageElement = adapt.replaceImageElement.bind(adapt)
     Command.saveAsImageElement = adapt.saveAsImageElement.bind(adapt)
+    Command.changeImageDisplay = adapt.changeImageDisplay.bind(adapt)
     Command.getImage = adapt.getImage.bind(adapt)
     Command.getValue = adapt.getValue.bind(adapt)
     Command.getWordCount = adapt.getWordCount.bind(adapt)
+    Command.getRangeText = adapt.getRangeText.bind(adapt)
     Command.pageMode = adapt.pageMode.bind(adapt)
     Command.pageScaleRecovery = adapt.pageScaleRecovery.bind(adapt)
     Command.pageScaleMinus = adapt.pageScaleMinus.bind(adapt)
     Command.pageScaleAdd = adapt.pageScaleAdd.bind(adapt)
+    Command.paperSize = adapt.paperSize.bind(adapt)
+    Command.getPaperMargin = adapt.getPaperMargin.bind(adapt)
+    Command.setPaperMargin = adapt.setPaperMargin.bind(adapt)
     Command.insertElementList = adapt.insertElementList.bind(adapt)
     Command.removeControl = adapt.removeControl.bind(adapt)
   }
@@ -238,6 +258,10 @@ export class Command {
     return Command.right(RowFlex.RIGHT)
   }
 
+  public executeAlignment() {
+    return Command.alignment(RowFlex.ALIGNMENT)
+  }
+
   public executeRowMargin(payload: number) {
     return Command.rowMargin(payload)
   }
@@ -295,6 +319,10 @@ export class Command {
     return Command.cancelHyperlink()
   }
 
+  public executeEditHyperlink(payload: string) {
+    return Command.editHyperlink(payload)
+  }
+
   public executeImage(payload: IDrawImagePayload) {
     return Command.image(payload)
   }
@@ -319,6 +347,18 @@ export class Command {
     return Command.search(payload)
   }
 
+  public executeSearchNavigatePre() {
+    return Command.searchNavigatePre()
+  }
+
+  public executeSearchNavigateNext() {
+    return Command.searchNavigateNext()
+  }
+
+  public getSearchNavigateInfo(): null | INavigateInfo {
+    return Command.getSearchNavigateInfo()
+  }
+
   public executeReplace(payload: string) {
     return Command.replace(payload)
   }
@@ -335,6 +375,10 @@ export class Command {
     return Command.saveAsImageElement()
   }
 
+  public executeChangeImageDisplay(element: IElement, display: ImageDisplay) {
+    return Command.changeImageDisplay(element, display)
+  }
+
   public getImage(): string[] {
     return Command.getImage()
   }
@@ -347,7 +391,11 @@ export class Command {
     return Command.getWordCount()
   }
 
-  // 页面模式、页面缩放
+  public getRangeText(): string {
+    return Command.getRangeText()
+  }
+
+  // 页面模式、页面缩放、纸张大小、页边距
   public executePageMode(payload: PageMode) {
     return Command.pageMode(payload)
   }
@@ -362,6 +410,18 @@ export class Command {
 
   public executePageScaleAdd() {
     return Command.pageScaleAdd()
+  }
+
+  public executePaperSize(width: number, height: number) {
+    return Command.paperSize(width, height)
+  }
+
+  public getPaperMargin() {
+    return Command.getPaperMargin()
+  }
+
+  public executeSetPaperMargin(payload: IMargin) {
+    return Command.setPaperMargin(payload)
   }
 
   // 通用

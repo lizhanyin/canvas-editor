@@ -1,7 +1,7 @@
 import { WRAP, ZERO } from '../../dataset/constant/Common'
 import { EDITOR_ELEMENT_STYLE_ATTR } from '../../dataset/constant/Element'
 import { defaultWatermarkOption } from '../../dataset/constant/Watermark'
-import { ControlComponent } from '../../dataset/enum/Control'
+import { ControlComponent, ImageDisplay } from '../../dataset/enum/Control'
 import { EditorContext, EditorMode, PageMode } from '../../dataset/enum/Editor'
 import { ElementType } from '../../dataset/enum/Element'
 import { ElementStyleKey } from '../../dataset/enum/ElementStyle'
@@ -9,6 +9,7 @@ import { RowFlex } from '../../dataset/enum/Row'
 import { IDrawImagePayload, IPainterOptions } from '../../interface/Draw'
 import { IEditorOption, IEditorResult } from '../../interface/Editor'
 import { IElement, IElementStyle } from '../../interface/Element'
+import { IMargin } from '../../interface/Margin'
 import { IColgroup } from '../../interface/table/Colgroup'
 import { ITd } from '../../interface/table/Td'
 import { ITr } from '../../interface/table/Tr'
@@ -18,6 +19,7 @@ import { formatElementList } from '../../utils/element'
 import { printImageBase64 } from '../../utils/print'
 import { Control } from '../draw/control/Control'
 import { Draw } from '../draw/Draw'
+import { INavigateInfo, Search } from '../draw/interactive/Search'
 import { TableTool } from '../draw/particle/table/TableTool'
 import { CanvasEvent } from '../event/CanvasEvent'
 import { HistoryManager } from '../history/HistoryManager'
@@ -39,6 +41,7 @@ export class CommandAdapt {
   private options: Required<IEditorOption>
   private control: Control
   private workerManager: WorkerManager
+  private searchManager: Search
 
   constructor(draw: Draw) {
     this.draw = draw
@@ -50,6 +53,7 @@ export class CommandAdapt {
     this.options = draw.getOptions()
     this.control = draw.getControl()
     this.workerManager = draw.getWorkerManager()
+    this.searchManager = draw.getSearch()
   }
 
   public mode(payload: EditorMode) {
@@ -339,18 +343,17 @@ export class CommandAdapt {
     if (isReadonly) return
     const { startIndex, endIndex } = this.range.getRange()
     if (!~startIndex && !~endIndex) return
-    const pageNo = this.draw.getPageNo()
+    // 选区行信息
+    const rangeRow = this.range.getRangeRow()
+    if (!rangeRow) return
     const positionList = this.position.getPositionList()
-    // 开始/结束行号
-    const startRowNo = positionList[startIndex].rowNo
-    const endRowNo = positionList[endIndex].rowNo
     const elementList = this.draw.getElementList()
     // 当前选区所在行
     for (let p = 0; p < positionList.length; p++) {
       const position = positionList[p]
-      if (position.pageNo !== pageNo) continue
-      if (position.rowNo > endRowNo) break
-      if (position.rowNo >= startRowNo && position.rowNo <= endRowNo) {
+      const rowSet = rangeRow.get(position.pageNo)
+      if (!rowSet) continue
+      if (rowSet.has(position.rowNo)) {
         elementList[p].rowFlex = payload
       }
     }
@@ -365,18 +368,17 @@ export class CommandAdapt {
     if (isReadonly) return
     const { startIndex, endIndex } = this.range.getRange()
     if (!~startIndex && !~endIndex) return
-    const pageNo = this.draw.getPageNo()
+    // 选区行信息
+    const rangeRow = this.range.getRangeRow()
+    if (!rangeRow) return
     const positionList = this.position.getPositionList()
-    // 开始/结束行号
-    const startRowNo = positionList[startIndex].rowNo
-    const endRowNo = positionList[endIndex].rowNo
     const elementList = this.draw.getElementList()
     // 当前选区所在行
     for (let p = 0; p < positionList.length; p++) {
       const position = positionList[p]
-      if (position.pageNo !== pageNo) continue
-      if (position.rowNo > endRowNo) break
-      if (position.rowNo >= startRowNo && position.rowNo <= endRowNo) {
+      const rowSet = rangeRow.get(position.pageNo)
+      if (!rowSet) continue
+      if (rowSet.has(position.rowNo)) {
         elementList[p].rowMargin = payload
       }
     }
@@ -428,7 +430,9 @@ export class CommandAdapt {
       trList
     }
     // 格式化element
-    formatElementList([element])
+    formatElementList([element], {
+      editorOptions: this.options
+    })
     const curIndex = startIndex + 1
     if (startIndex === endIndex) {
       elementList.splice(curIndex, 0, element)
@@ -1026,7 +1030,7 @@ export class CommandAdapt {
     while (preIndex > 0) {
       const preElement = elementList[preIndex]
       if (preElement.hyperlinkId !== startElement.hyperlinkId) {
-        leftIndex = preIndex
+        leftIndex = preIndex + 1
         break
       }
       preIndex--
@@ -1056,11 +1060,13 @@ export class CommandAdapt {
     const elementList = this.draw.getElementList()
     const [leftIndex, rightIndex] = hyperRange
     // 删除元素
-    elementList.splice(leftIndex + 1, rightIndex - leftIndex)
+    elementList.splice(leftIndex, rightIndex - leftIndex + 1)
+    this.draw.getHyperlinkParticle().clearHyperlinkPopup()
     // 重置画布
-    this.range.setRange(leftIndex, leftIndex)
+    const newIndex = leftIndex - 1
+    this.range.setRange(newIndex, newIndex)
     this.draw.render({
-      curIndex: leftIndex
+      curIndex: newIndex
     })
   }
 
@@ -1078,6 +1084,27 @@ export class CommandAdapt {
       delete element.hyperlinkId
       delete element.underline
     }
+    this.draw.getHyperlinkParticle().clearHyperlinkPopup()
+    // 重置画布
+    const { endIndex } = this.range.getRange()
+    this.draw.render({
+      curIndex: endIndex,
+      isComputeRowList: false
+    })
+  }
+
+  public editHyperlink(payload: string) {
+    // 获取超链接索引
+    const hyperRange = this.getHyperlinkRange()
+    if (!hyperRange) return
+    const elementList = this.draw.getElementList()
+    const [leftIndex, rightIndex] = hyperRange
+    // 替换url
+    for (let i = leftIndex; i <= rightIndex; i++) {
+      const element = elementList[i]
+      element.url = payload
+    }
+    this.draw.getHyperlinkParticle().clearHyperlinkPopup()
     // 重置画布
     const { endIndex } = this.range.getRange()
     this.draw.render({
@@ -1187,11 +1214,33 @@ export class CommandAdapt {
   }
 
   public search(payload: string | null) {
-    this.draw.setSearchKeyword(payload)
+    this.searchManager.setSearchKeyword(payload)
     this.draw.render({
       isSetCursor: false,
       isSubmitHistory: false
     })
+  }
+
+  public searchNavigatePre() {
+    const index = this.searchManager.searchNavigatePre()
+    if (index === null) return
+    this.draw.render({
+      isSetCursor: false,
+      isSubmitHistory: false
+    })
+  }
+
+  public searchNavigateNext() {
+    const index = this.searchManager.searchNavigateNext()
+    if (index === null) return
+    this.draw.render({
+      isSetCursor: false,
+      isSubmitHistory: false
+    })
+  }
+
+  public getSearchNavigateInfo(): null | INavigateInfo {
+    return this.searchManager.getSearchNavigateInfo()
   }
 
   public replace(payload: string) {
@@ -1332,6 +1381,15 @@ export class CommandAdapt {
     downloadFile(element.value, `${element.id!}.png`)
   }
 
+  public changeImageDisplay(element: IElement, display: ImageDisplay) {
+    if (element.imgDisplay === display) return
+    element.imgDisplay = display
+    this.draw.getPreviewer().clearResizer()
+    this.draw.render({
+      isSetCursor: false
+    })
+  }
+
   public getImage(): string[] {
     return this.draw.getDataURL()
   }
@@ -1342,6 +1400,10 @@ export class CommandAdapt {
 
   public getWordCount(): Promise<number> {
     return this.workerManager.getWordCount()
+  }
+
+  public getRangeText(): string {
+    return this.range.toString()
   }
 
   public pageMode(payload: PageMode) {
@@ -1369,6 +1431,18 @@ export class CommandAdapt {
     if (nextScale <= 30) {
       this.draw.setPageScale(nextScale / 10)
     }
+  }
+
+  public paperSize(width: number, height: number) {
+    this.draw.setPaperSize(width, height)
+  }
+
+  public getPaperMargin(): number[] {
+    return this.draw.getOriginalMargins()
+  }
+
+  public setPaperMargin(payload: IMargin) {
+    return this.draw.setPaperMargin(payload)
   }
 
   public insertElementList(payload: IElement[]) {

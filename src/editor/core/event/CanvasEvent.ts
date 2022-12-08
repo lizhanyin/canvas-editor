@@ -1,4 +1,4 @@
-import { ElementType } from '../..'
+import { ElementType, IEditorOption } from '../..'
 import { ZERO } from '../../dataset/constant/Common'
 import { EDITOR_ELEMENT_COPY_ATTR } from '../../dataset/constant/Element'
 import { ElementStyleKey } from '../../dataset/enum/ElementStyle'
@@ -18,8 +18,10 @@ import { RangeManager } from '../range/RangeManager'
 import { LETTER_REG, NUMBER_LIKE_REG } from '../../dataset/constant/Regular'
 import { Control } from '../draw/control/Control'
 import { CheckboxControl } from '../draw/control/checkbox/CheckboxControl'
-import { splitText } from '../../utils'
+import { splitText, threeClick } from '../../utils'
 import { Previewer } from '../draw/particle/previewer/Previewer'
+import { DeepRequired } from '../../interface/Common'
+import { DateParticle } from '../draw/particle/date/DateParticle'
 
 export class CanvasEvent {
 
@@ -28,6 +30,7 @@ export class CanvasEvent {
   private mouseDownStartPosition: ICurrentPosition | null
 
   private draw: Draw
+  private options: DeepRequired<IEditorOption>
   private pageContainer: HTMLDivElement
   private pageList: HTMLCanvasElement[]
   private position: Position
@@ -37,6 +40,7 @@ export class CanvasEvent {
   private previewer: Previewer
   private tableTool: TableTool
   private hyperlinkParticle: HyperlinkParticle
+  private dateParticle: DateParticle
   private listener: Listener
   private control: Control
 
@@ -48,6 +52,7 @@ export class CanvasEvent {
     this.pageContainer = draw.getPageContainer()
     this.pageList = draw.getPageList()
     this.draw = draw
+    this.options = draw.getOptions()
     this.cursor = null
     this.position = this.draw.getPosition()
     this.range = this.draw.getRange()
@@ -55,6 +60,7 @@ export class CanvasEvent {
     this.previewer = this.draw.getPreviewer()
     this.tableTool = this.draw.getTableTool()
     this.hyperlinkParticle = this.draw.getHyperlinkParticle()
+    this.dateParticle = this.draw.getDateParticle()
     this.listener = this.draw.getListener()
     this.control = this.draw.getControl()
   }
@@ -66,6 +72,7 @@ export class CanvasEvent {
     this.pageContainer.addEventListener('mouseleave', this.mouseleave.bind(this))
     this.pageContainer.addEventListener('mousemove', this.mousemove.bind(this))
     this.pageContainer.addEventListener('dblclick', this.dblclick.bind(this))
+    threeClick(this.pageContainer, this.threeClick.bind(this))
   }
 
   public setIsAllowDrag(payload: boolean) {
@@ -235,6 +242,7 @@ export class CanvasEvent {
     const isDirectHitCheckbox = !!(isDirectHit && isCheckbox)
     if (~index) {
       this.range.setRange(curIndex, curIndex)
+      this.position.setCursorPosition(positionList[curIndex])
       // 复选框
       const isSetCheckbox = isDirectHitCheckbox && !isReadonly
       if (isSetCheckbox) {
@@ -280,6 +288,11 @@ export class CanvasEvent {
     this.hyperlinkParticle.clearHyperlinkPopup()
     if (curElement.type === ElementType.HYPERLINK) {
       this.hyperlinkParticle.drawHyperlinkPopup(curElement, positionList[curIndex])
+    }
+    // 日期控件
+    this.dateParticle.clearDatePicker()
+    if (curElement.type === ElementType.DATE && !isReadonly) {
+      this.dateParticle.renderDatePicker(curElement, positionList[curIndex])
     }
   }
 
@@ -440,11 +453,13 @@ export class CanvasEvent {
       evt.preventDefault()
     } else if (evt.ctrlKey && evt.key === KeyMap.C) {
       this.copy()
+      evt.preventDefault()
     } else if (evt.ctrlKey && evt.key === KeyMap.X) {
-      if (isReadonly) return
       this.cut()
+      evt.preventDefault()
     } else if (evt.ctrlKey && evt.key === KeyMap.A) {
       this.selectAll()
+      evt.preventDefault()
     } else if (evt.ctrlKey && evt.key === KeyMap.S) {
       if (isReadonly) return
       if (this.listener.saved) {
@@ -453,6 +468,13 @@ export class CanvasEvent {
       evt.preventDefault()
     } else if (evt.key === KeyMap.ESC) {
       this.clearPainterStyle()
+      evt.preventDefault()
+    } else if (evt.key === KeyMap.TAB) {
+      this.draw.insertElementList([{
+        type: ElementType.TAB,
+        value: ''
+      }])
+      evt.preventDefault()
     }
   }
 
@@ -499,6 +521,46 @@ export class CanvasEvent {
     })
   }
 
+  public threeClick() {
+    const cursorPosition = this.position.getCursorPosition()
+    if (!cursorPosition) return
+    const { index } = cursorPosition
+    const elementList = this.draw.getElementList()
+    // 判断是否是零宽字符
+    let upCount = 0
+    let downCount = 0
+    // 向上查询
+    let upStartIndex = index - 1
+    while (upStartIndex > 0) {
+      const value = elementList[upStartIndex].value
+      if (value !== ZERO) {
+        upCount++
+        upStartIndex--
+      } else {
+        break
+      }
+    }
+    // 向下查询
+    let downStartIndex = index + 1
+    while (downStartIndex < elementList.length) {
+      const value = elementList[downStartIndex].value
+      if (value !== ZERO) {
+        downCount++
+        downStartIndex++
+      } else {
+        break
+      }
+    }
+    // 设置选中区域
+    this.range.setRange(index - upCount - 1, index + downCount)
+    // 刷新文档
+    this.draw.render({
+      isSubmitHistory: false,
+      isSetCursor: false,
+      isComputeRowList: false
+    })
+  }
+
   public input(data: string) {
     const isReadonly = this.draw.isReadonly()
     if (isReadonly) return
@@ -510,7 +572,7 @@ export class CanvasEvent {
       return
     }
     const activeControl = this.control.getActiveControl()
-    const { TEXT, HYPERLINK, SUBSCRIPT, SUPERSCRIPT } = ElementType
+    const { TEXT, HYPERLINK, SUBSCRIPT, SUPERSCRIPT, DATE } = ElementType
     const text = data.replaceAll(`\n`, ZERO)
     const elementList = this.draw.getElementList()
     const agentDom = this.cursor.getAgentDom()
@@ -536,6 +598,7 @@ export class CanvasEvent {
         element.type === TEXT
         || (!element.type && element.value !== ZERO)
         || (element.type === HYPERLINK && nextElement?.type === HYPERLINK)
+        || (element.type === DATE && nextElement?.type === DATE)
         || (element.type === SUBSCRIPT && nextElement?.type === SUBSCRIPT)
         || (element.type === SUPERSCRIPT && nextElement?.type === SUPERSCRIPT)
       ) {
@@ -579,7 +642,7 @@ export class CanvasEvent {
     const { startIndex, endIndex } = this.range.getRange()
     const elementList = this.draw.getElementList()
     if (startIndex !== endIndex) {
-      writeElementList(elementList.slice(startIndex + 1, endIndex + 1))
+      writeElementList(elementList.slice(startIndex + 1, endIndex + 1), this.options)
       let curIndex: number
       if (activeControl) {
         curIndex = this.control.cut()
@@ -596,7 +659,7 @@ export class CanvasEvent {
     const { startIndex, endIndex } = this.range.getRange()
     const elementList = this.draw.getElementList()
     if (startIndex !== endIndex) {
-      writeElementList(elementList.slice(startIndex + 1, endIndex + 1))
+      writeElementList(elementList.slice(startIndex + 1, endIndex + 1), this.options)
     }
   }
 

@@ -1,3 +1,4 @@
+import { NAME_PLACEHOLDER } from '../../dataset/constant/ContextMenu'
 import { EDITOR_COMPONENT } from '../../dataset/constant/Editor'
 import { EditorComponent } from '../../dataset/enum/Editor'
 import { IContextMenuContext, IRegisterContextMenu } from '../../interface/contextmenu/ContextMenu'
@@ -29,6 +30,7 @@ export class ContextMenu {
   private contextMenuList: IRegisterContextMenu[]
   private contextMenuContainerList: HTMLDivElement[]
   private contextMenuRelationShip: Map<HTMLDivElement, HTMLDivElement>
+  private context: IContextMenuContext | null
 
   constructor(draw: Draw, command: Command) {
     this.draw = draw
@@ -36,6 +38,7 @@ export class ContextMenu {
     this.range = draw.getRange()
     this.position = draw.getPosition()
     this.container = draw.getContainer()
+    this.context = null
     // 内部菜单
     this.contextMenuList = [
       ...globalMenus,
@@ -53,7 +56,7 @@ export class ContextMenu {
   }
 
   private _proxyContextMenuEvent(evt: MouseEvent) {
-    const context = this._getContext()
+    this.context = this._getContext()
     const renderList: IRegisterContextMenu[] = []
     let isRegisterContextMenu = false
     for (let c = 0; c < this.contextMenuList.length; c++) {
@@ -61,7 +64,7 @@ export class ContextMenu {
       if (menu.isDivider) {
         renderList.push(menu)
       } else {
-        const isMatch = menu.when?.(context)
+        const isMatch = menu.when?.(this.context)
         if (isMatch) {
           renderList.push(menu)
           isRegisterContextMenu = true
@@ -186,8 +189,8 @@ export class ContextMenu {
             this._setHoverStatus(menuItem, false)
           }
           menuItem.onclick = () => {
-            if (menu.callback) {
-              menu.callback(this.command)
+            if (menu.callback && this.context) {
+              menu.callback(this.command, this.context)
             }
             this.dispose()
           }
@@ -200,7 +203,8 @@ export class ContextMenu {
         }
         // 文本
         const span = document.createElement('span')
-        span.append(document.createTextNode(menu.name!))
+        const name = this._formatName(menu.name!)
+        span.append(document.createTextNode(name))
         menuItem.append(span)
         // 快捷方式提示
         if (menu.shortCut) {
@@ -214,7 +218,13 @@ export class ContextMenu {
     }
     contextMenuContainer.append(contextMenuContent)
     contextMenuContainer.style.display = 'block'
-    contextMenuContainer.style.left = `${left}px`
+    const innerWidth = window.innerWidth
+    const contextMenuWidth = contextMenuContainer.getBoundingClientRect().width
+    // 右侧空间不足时，以菜单右上角作为起始点
+    const adjustLeft = left + contextMenuWidth > innerWidth
+      ? left - contextMenuWidth
+      : left
+    contextMenuContainer.style.left = `${adjustLeft}px`
     contextMenuContainer.style.top = `${top}px`
     this.contextMenuContainerList.push(contextMenuContainer)
     return contextMenuContainer
@@ -237,6 +247,21 @@ export class ContextMenu {
     } else {
       payload.classList.remove('hover')
     }
+  }
+
+  private _formatName(name: string): string {
+    const placeholderValues = Object.values(NAME_PLACEHOLDER)
+    const placeholderReg = new RegExp(`${placeholderValues.join('|')}`)
+    let formatName = name
+    if (placeholderReg.test(formatName)) {
+      // 选区名称
+      const selectedReg = new RegExp(NAME_PLACEHOLDER.SELECTED_TEXT, 'g')
+      if (selectedReg.test(formatName)) {
+        const selectedText = this.range.toString()
+        formatName = formatName.replace(selectedReg, selectedText)
+      }
+    }
+    return formatName
   }
 
   public registerContextMenuList(payload: IRegisterContextMenu[]) {
