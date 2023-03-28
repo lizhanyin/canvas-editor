@@ -1,3 +1,4 @@
+import { EDITOR_PREFIX } from '../../dataset/constant/Editor'
 import { ElementType } from '../../dataset/enum/Element'
 import { debounce } from '../../utils'
 import { getElementListByHTML } from '../../utils/clipboard'
@@ -18,7 +19,7 @@ export class CursorAgent {
     // 代理光标绘制
     const agentCursorDom = document.createElement('textarea')
     agentCursorDom.autocomplete = 'off'
-    agentCursorDom.classList.add('inputarea')
+    agentCursorDom.classList.add(`${EDITOR_PREFIX}-inputarea`)
     agentCursorDom.innerText = ''
     this.container.append(agentCursorDom)
     this.agentCursorDom = agentCursorDom
@@ -65,7 +66,9 @@ export class CursorAgent {
         }
         if (item.type === 'text/html' && isHTML) {
           item.getAsString(htmlText => {
-            const elementList = getElementListByHTML(htmlText)
+            const elementList = getElementListByHTML(htmlText, {
+              innerWidth: this.draw.getOriginalInnerWidth()
+            })
             this.draw.insertElementList(elementList)
           })
         }
@@ -100,8 +103,8 @@ export class CursorAgent {
     this.canvasEvent.compositionstart()
   }
 
-  private _compositionend() {
-    this.canvasEvent.compositionend()
+  private _compositionend(evt: CompositionEvent) {
+    this.canvasEvent.compositionend(evt)
   }
 
 }

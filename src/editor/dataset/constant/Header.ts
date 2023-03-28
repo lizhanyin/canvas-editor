@@ -1,8 +1,7 @@
 import { IHeader } from '../../interface/Header'
+import { MaxHeightRatio } from '../enum/Common'
 
 export const defaultHeaderOption: Readonly<Required<IHeader>> = {
-  data: '',
-  color: '#AAAAAA',
-  size: 14,
-  font: 'Yahei'
+  top: 30,
+  maxHeightRadio: MaxHeightRatio.HALF
 }

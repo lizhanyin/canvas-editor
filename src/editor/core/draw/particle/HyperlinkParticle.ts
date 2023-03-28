@@ -1,4 +1,5 @@
 import { IElement } from '../../..'
+import { EDITOR_PREFIX } from '../../../dataset/constant/Editor'
 import { IEditorOption } from '../../../interface/Editor'
 import { IElementPosition } from '../../../interface/Element'
 import { IRowElement } from '../../../interface/Row'
@@ -23,9 +24,10 @@ export class HyperlinkParticle {
 
   private _createHyperlinkPopupDom() {
     const hyperlinkPopupContainer = document.createElement('div')
-    hyperlinkPopupContainer.classList.add('hyperlink-popup')
+    hyperlinkPopupContainer.classList.add(`${EDITOR_PREFIX}-hyperlink-popup`)
     const hyperlinkDom = document.createElement('a')
     hyperlinkDom.target = '_blank'
+    hyperlinkDom.rel = 'noopener'
     hyperlinkPopupContainer.append(hyperlinkDom)
     this.container.append(hyperlinkPopupContainer)
     return { hyperlinkPopupContainer, hyperlinkDom }
@@ -43,11 +45,19 @@ export class HyperlinkParticle {
     // 标签
     const url = element.url || '#'
     this.hyperlinkDom.href = url
+    this.hyperlinkDom.title = url
     this.hyperlinkDom.innerText = url
   }
 
   public clearHyperlinkPopup() {
     this.hyperlinkPopupContainer.style.display = 'none'
+  }
+
+  public openHyperlink(element: IElement) {
+    const newTab = window.open(element.url, '_blank')
+    if (newTab) {
+      newTab.opener = null
+    }
   }
 
   public render(ctx: CanvasRenderingContext2D, element: IRowElement, x: number, y: number) {

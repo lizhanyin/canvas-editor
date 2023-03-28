@@ -1,5 +1,5 @@
 import { Draw } from '../draw/Draw'
-import WordCountWorker from './works/wordCount?worker'
+import WordCountWorker from './works/wordCount?worker&inline'
 
 export class WorkerManager {
 
@@ -21,7 +21,7 @@ export class WorkerManager {
         reject(evt)
       }
 
-      const elementList = this.draw.getOriginalElementList()
+      const elementList = this.draw.getOriginalMainElementList()
       this.wordCountWorker.postMessage(elementList)
     })
   }

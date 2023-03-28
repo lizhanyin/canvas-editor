@@ -1,16 +1,27 @@
 import { IElement } from '..'
-import { EditorMode, PageMode } from '../dataset/enum/Editor'
+import { EditorMode, PageMode, PaperDirection } from '../dataset/enum/Editor'
 import { ICheckboxOption } from './Checkbox'
 import { IControlOption } from './Control'
+import { ICursorOption } from './Cursor'
+import { IFooter } from './Footer'
 import { IHeader } from './Header'
 import { IMargin } from './Margin'
+import { IPageNumber } from './PageNumber'
 import { IWatermark } from './Watermark'
+
+export interface IEditorData {
+  header?: IElement[];
+  main: IElement[];
+  footer?: IElement[];
+}
 
 export interface IEditorOption {
   mode?: EditorMode;
   defaultType?: string;
   defaultFont?: string;
   defaultSize?: number;
+  minSize?: number;
+  maxSize?: number;
   defaultBasicRowMarginHeight?: number;
   defaultRowMargin?: number;
   defaultTabWidth?: number;
@@ -18,9 +29,6 @@ export interface IEditorOption {
   height?: number;
   scale?: number;
   pageGap?: number;
-  pageNumberBottom?: number;
-  pageNumberSize?: number;
-  pageNumberFont?: string;
   underlineColor?: string;
   strikeoutColor?: string;
   rangeColor?: string;
@@ -37,13 +45,17 @@ export interface IEditorOption {
   margins?: IMargin,
   pageMode?: PageMode;
   tdPadding?: number;
-  defaultTdHeight?: number;
+  defaultTrMinHeight?: number;
   defaultHyperlinkColor?: string;
-  headerTop?: number;
+  paperDirection?: PaperDirection;
+  inactiveAlpha?: number;
   header?: IHeader;
+  footer?: IFooter;
+  pageNumber?: IPageNumber;
   watermark?: IWatermark;
   control?: IControlOption;
   checkbox?: ICheckboxOption;
+  cursor?: ICursorOption;
 }
 
 export interface IEditorResult {
@@ -51,7 +63,6 @@ export interface IEditorResult {
   width: number;
   height: number;
   margins: IMargin;
-  header?: IHeader;
   watermark?: IWatermark;
-  data: IElement[];
+  data: IEditorData;
 }

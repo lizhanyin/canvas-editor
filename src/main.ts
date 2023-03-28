@@ -1,28 +1,53 @@
 import { data, options } from './mock'
 import './style.css'
 import prism from 'prismjs'
-import Editor, { BlockType, Command, ControlType, EditorMode, ElementType, IBlock, IElement, KeyMap, PageMode } from './editor'
+import Editor, { BlockType, Command, ControlType, EditorMode, ElementType, IBlock, IElement, KeyMap, PageMode, PaperDirection, RowFlex } from './editor'
 import { Dialog } from './components/dialog/Dialog'
 import { formatPrismToken } from './utils/prism'
 import { Signature } from './components/signature/Signature'
 
 window.onload = function () {
+  const isApple = typeof navigator !== 'undefined' && /Mac OS X/.test(navigator.userAgent)
 
   // 1. 初始化编辑器
   const container = document.querySelector<HTMLDivElement>('.editor')!
-  const instance = new Editor(container, <IElement[]>data, options)
+  const instance = new Editor(
+    container,
+    {
+      header: [{
+        value: '第一人民医院',
+        size: 32,
+        rowFlex: RowFlex.CENTER
+      }, {
+        value: '\n门诊病历',
+        size: 18,
+        rowFlex: RowFlex.CENTER
+      }, {
+        value: '\n',
+        type: ElementType.SEPARATOR
+      }],
+      main: <IElement[]>data,
+      footer: [{
+        value: 'canvas-editor',
+        size: 12
+      }]
+    },
+    options
+  )
   console.log('实例: ', instance)
   // cypress使用
   Reflect.set(window, 'editor', instance)
 
   // 2. | 撤销 | 重做 | 格式刷 | 清除格式 |
   const undoDom = document.querySelector<HTMLDivElement>('.menu-item__undo')!
+  undoDom.title = `撤销(${isApple ? '⌘' : 'Ctrl'}+Z)`
   undoDom.onclick = function () {
     console.log('undo')
     instance.command.executeUndo()
   }
 
   const redoDom = document.querySelector<HTMLDivElement>('.menu-item__redo')!
+  redoDom.title = `重做(${isApple ? '⌘' : 'Ctrl'}+Y)`
   redoDom.onclick = function () {
     console.log('redo')
     instance.command.executeRedo()
@@ -60,29 +85,49 @@ window.onload = function () {
     instance.command.executeFont(li.dataset.family!)
   }
 
-  document.querySelector<HTMLDivElement>('.menu-item__size-add')!.onclick = function () {
+  const sizeSetDom = document.querySelector<HTMLDivElement>('.menu-item__size')!
+  const sizeSelectDom = sizeSetDom.querySelector<HTMLDivElement>('.select')!
+  const sizeOptionDom = sizeSetDom.querySelector<HTMLDivElement>('.options')!
+  sizeSetDom.title = `设置字号`
+  sizeSetDom.onclick = function () {
+    console.log('size')
+    sizeOptionDom.classList.toggle('visible')
+  }
+  sizeOptionDom.onclick = function (evt) {
+    const li = evt.target as HTMLLIElement
+    instance.command.executeSize(Number(li.dataset.size!))
+  }
+
+  const sizeAddDom = document.querySelector<HTMLDivElement>('.menu-item__size-add')!
+  sizeAddDom.title = `增大字号(${isApple ? '⌘' : 'Ctrl'}+[)`
+  sizeAddDom.onclick = function () {
     console.log('size-add')
     instance.command.executeSizeAdd()
   }
 
-  document.querySelector<HTMLDivElement>('.menu-item__size-minus')!.onclick = function () {
+  const sizeMinusDom = document.querySelector<HTMLDivElement>('.menu-item__size-minus')!
+  sizeMinusDom.title = `减小字号(${isApple ? '⌘' : 'Ctrl'}+])`
+  sizeMinusDom.onclick = function () {
     console.log('size-minus')
     instance.command.executeSizeMinus()
   }
 
   const boldDom = document.querySelector<HTMLDivElement>('.menu-item__bold')!
+  boldDom.title = `加粗(${isApple ? '⌘' : 'Ctrl'}+B)`
   boldDom.onclick = function () {
     console.log('bold')
     instance.command.executeBold()
   }
 
   const italicDom = document.querySelector<HTMLDivElement>('.menu-item__italic')!
+  italicDom.title = `斜体(${isApple ? '⌘' : 'Ctrl'}+I)`
   italicDom.onclick = function () {
     console.log('italic')
     instance.command.executeItalic()
   }
 
   const underlineDom = document.querySelector<HTMLDivElement>('.menu-item__underline')!
+  underlineDom.title = `下划线(${isApple ? '⌘' : 'Ctrl'}+U)`
   underlineDom.onclick = function () {
     console.log('underline')
     instance.command.executeUnderline()
@@ -95,12 +140,14 @@ window.onload = function () {
   }
 
   const superscriptDom = document.querySelector<HTMLDivElement>('.menu-item__superscript')!
+  superscriptDom.title = `上标(${isApple ? '⌘' : 'Ctrl'}+Shift+,)`
   superscriptDom.onclick = function () {
     console.log('superscript')
     instance.command.executeSuperscript()
   }
 
   const subscriptDom = document.querySelector<HTMLDivElement>('.menu-item__subscript')!
+  subscriptDom.title = `下标(${isApple ? '⌘' : 'Ctrl'}+Shift+.)`
   subscriptDom.onclick = function () {
     console.log('subscript')
     instance.command.executeSubscript()
@@ -129,24 +176,28 @@ window.onload = function () {
   }
 
   const leftDom = document.querySelector<HTMLDivElement>('.menu-item__left')!
+  leftDom.title = `左对齐(${isApple ? '⌘' : 'Ctrl'}+L)`
   leftDom.onclick = function () {
     console.log('left')
     instance.command.executeLeft()
   }
 
   const centerDom = document.querySelector<HTMLDivElement>('.menu-item__center')!
+  centerDom.title = `居中对齐(${isApple ? '⌘' : 'Ctrl'}+E)`
   centerDom.onclick = function () {
     console.log('center')
     instance.command.executeCenter()
   }
 
   const rightDom = document.querySelector<HTMLDivElement>('.menu-item__right')!
+  rightDom.title = `右对齐(${isApple ? '⌘' : 'Ctrl'}+R)`
   rightDom.onclick = function () {
     console.log('right')
     instance.command.executeRight()
   }
 
   const alignmentDom = document.querySelector<HTMLDivElement>('.menu-item__alignment')!
+  alignmentDom.title = `两端对齐(${isApple ? '⌘' : 'Ctrl'}+J)`
   alignmentDom.onclick = function () {
     console.log('alignment')
     instance.command.executeAlignment()
@@ -697,6 +748,7 @@ window.onload = function () {
   const searchInputDom = document.querySelector<HTMLInputElement>('.menu-item__search__collapse__search input')!
   const replaceInputDom = document.querySelector<HTMLInputElement>('.menu-item__search__collapse__replace input')!
   const searchDom = document.querySelector<HTMLDivElement>('.menu-item__search')!
+  searchDom.title = `搜索与替换(${isApple ? '⌘' : 'Ctrl'}+F)`
   const searchResultDom = searchCollapseDom.querySelector<HTMLLabelElement>('.search-result')!
   function setSearchResult() {
     const result = instance.command.getSearchNavigateInfo()
@@ -754,12 +806,14 @@ window.onload = function () {
     setSearchResult()
   }
 
-  document.querySelector<HTMLDivElement>('.menu-item__print')!.onclick = function () {
+  const printDom = document.querySelector<HTMLDivElement>('.menu-item__print')!
+  printDom.title = `打印(${isApple ? '⌘' : 'Ctrl'}+P)`
+  printDom.onclick = function () {
     console.log('print')
     instance.command.executePrint()
   }
 
-  // 6. 页面模式 | 纸张缩放 | 全屏
+  // 6. 页面模式 | 纸张缩放 | 纸张大小 | 纸张方向 | 页边距 | 全屏
   const pageModeDom = document.querySelector<HTMLDivElement>('.page-mode')!
   const pageModeOptionsDom = pageModeDom.querySelector<HTMLDivElement>('.options')!
   pageModeDom.onclick = function () {
@@ -798,6 +852,22 @@ window.onload = function () {
     instance.command.executePaperSize(width, height)
     // 纸张状态回显
     paperSizeDomOptionsDom.querySelectorAll('li')
+      .forEach(child => child.classList.remove('active'))
+    li.classList.add('active')
+  }
+
+  // 纸张方向
+  const paperDirectionDom = document.querySelector<HTMLDivElement>('.paper-direction')!
+  const paperDirectionDomOptionsDom = paperDirectionDom.querySelector<HTMLDivElement>('.options')!
+  paperDirectionDom.onclick = function () {
+    paperDirectionDomOptionsDom.classList.toggle('visible')
+  }
+  paperDirectionDomOptionsDom.onclick = function (evt) {
+    const li = evt.target as HTMLLIElement
+    const paperDirection = li.dataset.paperDirection!
+    instance.command.executePaperDirection(<PaperDirection>paperDirection)
+    // 纸张方向状态回显
+    paperDirectionDomOptionsDom.querySelectorAll('li')
       .forEach(child => child.classList.remove('active'))
     li.classList.add('active')
   }
@@ -925,10 +995,19 @@ window.onload = function () {
 
     // 富文本
     fontOptionDom.querySelectorAll<HTMLLIElement>('li').forEach(li => li.classList.remove('active'))
-    const curFontDom = fontOptionDom.querySelector<HTMLLIElement>(`[data-family=${payload.font}]`)
+    const curFontDom = fontOptionDom.querySelector<HTMLLIElement>(`[data-family='${payload.font}']`)
     if (curFontDom) {
       fontSelectDom.innerText = curFontDom.innerText
+      fontSelectDom.style.fontFamily = payload.font
       curFontDom.classList.add('active')
+    }
+    sizeOptionDom.querySelectorAll<HTMLLIElement>('li').forEach(li => li.classList.remove('active'))
+    const curSizeDom = sizeOptionDom.querySelector<HTMLLIElement>(`[data-size='${payload.size}']`)
+    if (curSizeDom) {
+      sizeSelectDom.innerText = curSizeDom.innerText
+      curSizeDom.classList.add('active')
+    } else {
+      sizeSelectDom.innerText = `${payload.size}`
     }
     payload.bold ? boldDom.classList.add('active') : boldDom.classList.remove('active')
     payload.italic ? italicDom.classList.add('active') : italicDom.classList.remove('active')
@@ -1061,7 +1140,7 @@ window.onload = function () {
   instance.register.shortcutList([
     {
       key: KeyMap.P,
-      ctrl: true,
+      mod: true,
       isGlobal: true,
       callback: (command: Command) => {
         command.executePrint()
@@ -1069,10 +1148,16 @@ window.onload = function () {
     },
     {
       key: KeyMap.F,
-      ctrl: true,
+      mod: true,
       isGlobal: true,
-      callback: () => {
+      callback: (command: Command) => {
+        const text = command.getRangeText()
         searchDom.click()
+        if (text) {
+          searchInputDom.value = text
+          instance.command.executeSearch(text)
+          setSearchResult()
+        }
       }
     },
     {

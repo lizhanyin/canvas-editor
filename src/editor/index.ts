@@ -1,5 +1,5 @@
 import './assets/css/index.css'
-import { IEditorOption, IEditorResult } from './interface/Editor'
+import { IEditorData, IEditorOption, IEditorResult } from './interface/Editor'
 import { IElement } from './interface/Element'
 import { Draw } from './core/draw/Draw'
 import { Command } from './core/command/Command'
@@ -11,7 +11,7 @@ import { formatElementList } from './utils/element'
 import { Register } from './core/register/Register'
 import { ContextMenu } from './core/contextmenu/ContextMenu'
 import { IContextMenuContext, IRegisterContextMenu } from './interface/contextmenu/ContextMenu'
-import { EditorComponent, EditorMode, PageMode } from './dataset/enum/Editor'
+import { EditorComponent, EditorZone, EditorMode, PageMode, PaperDirection } from './dataset/enum/Editor'
 import { EDITOR_COMPONENT } from './dataset/constant/Editor'
 import { IHeader } from './interface/Header'
 import { IWatermark } from './interface/Watermark'
@@ -28,17 +28,36 @@ import { Shortcut } from './core/shortcut/Shortcut'
 import { KeyMap } from './dataset/enum/KeyMap'
 import { BlockType } from './dataset/enum/Block'
 import { IBlock } from './interface/Block'
+import { ILang } from './interface/i18n/I18n'
+import { ICursorOption } from './interface/Cursor'
+import { defaultCursorOption } from './dataset/constant/Cursor'
+import { IPageNumber } from './interface/PageNumber'
+import { defaultPageNumberOption } from './dataset/constant/PageNumber'
+import { VerticalAlign } from './dataset/enum/VerticalAlign'
+import { TableBorder } from './dataset/enum/table/Table'
+import { IFooter } from './interface/Footer'
+import { defaultFooterOption } from './dataset/constant/Footer'
+import { MaxHeightRatio } from './dataset/enum/Common'
 
 export default class Editor {
 
   public command: Command
   public listener: Listener
   public register: Register
+  public destroy: Function
 
-  constructor(container: HTMLDivElement, elementList: IElement[], options: IEditorOption = {}) {
+  constructor(container: HTMLDivElement, data: IEditorData | IElement[], options: IEditorOption = {}) {
     const headerOptions: Required<IHeader> = {
       ...defaultHeaderOption,
       ...options.header
+    }
+    const footerOptions: Required<IFooter> = {
+      ...defaultFooterOption,
+      ...options.footer
+    }
+    const pageNumberOptions: Required<IPageNumber> = {
+      ...defaultPageNumberOption,
+      ...options.pageNumber
     }
     const waterMarkOptions: Required<IWatermark> = {
       ...defaultWatermarkOption,
@@ -52,12 +71,18 @@ export default class Editor {
       ...defaultCheckboxOption,
       ...options.checkbox
     }
+    const cursorOptions: Required<ICursorOption> = {
+      ...defaultCursorOption,
+      ...options.cursor
+    }
 
     const editorOptions: DeepRequired<IEditorOption> = {
       mode: EditorMode.EDIT,
       defaultType: 'TEXT',
       defaultFont: 'Yahei',
       defaultSize: 16,
+      minSize: 5,
+      maxSize: 72,
       defaultRowMargin: 1,
       defaultBasicRowMarginHeight: 8,
       defaultTabWidth: 32,
@@ -65,9 +90,6 @@ export default class Editor {
       height: 1123,
       scale: 1,
       pageGap: 20,
-      pageNumberBottom: 60,
-      pageNumberSize: 12,
-      pageNumberFont: 'Yahei',
       underlineColor: '#000000',
       strikeoutColor: '#FF0000',
       rangeAlpha: 0.6,
@@ -84,22 +106,49 @@ export default class Editor {
       margins: [100, 120, 100, 120],
       pageMode: PageMode.PAGING,
       tdPadding: 5,
-      defaultTdHeight: 40,
+      defaultTrMinHeight: 40,
       defaultHyperlinkColor: '#0000FF',
-      headerTop: 50,
+      paperDirection: PaperDirection.VERTICAL,
+      inactiveAlpha: 0.6,
       ...options,
       header: headerOptions,
+      footer: footerOptions,
+      pageNumber: pageNumberOptions,
       watermark: waterMarkOptions,
       control: controlOptions,
-      checkbox: checkboxOptions
+      checkbox: checkboxOptions,
+      cursor: cursorOptions
     }
-    formatElementList(elementList, {
-      editorOptions
-    })
+    // 数据处理
+    let headerElementList: IElement[] = []
+    let mainElementList: IElement[] = []
+    let footerElementList: IElement[] = []
+    if (Array.isArray(data)) {
+      mainElementList = data
+    } else {
+      headerElementList = data.header || []
+      mainElementList = data.main
+      footerElementList = data.footer || []
+    }
+    [headerElementList, mainElementList, footerElementList]
+      .forEach(elementList => {
+        formatElementList(elementList, {
+          editorOptions
+        })
+      })
     // 监听
     this.listener = new Listener()
     // 启动
-    const draw = new Draw(container, editorOptions, elementList, this.listener)
+    const draw = new Draw(
+      container,
+      editorOptions,
+      {
+        header: headerElementList,
+        main: mainElementList,
+        footer: footerElementList
+      },
+      this.listener
+    )
     // 命令
     this.command = new Command(new CommandAdapt(draw))
     // 菜单
@@ -109,8 +158,15 @@ export default class Editor {
     // 注册
     this.register = new Register({
       contextMenu,
-      shortcut
+      shortcut,
+      i18n: draw.getI18n()
     })
+    // 注册销毁方法
+    this.destroy = () => {
+      draw.destroy()
+      shortcut.removeEvent()
+      contextMenu.removeEvent()
+    }
   }
 
 }
@@ -119,6 +175,8 @@ export default class Editor {
 export {
   Editor,
   RowFlex,
+  VerticalAlign,
+  EditorZone,
   EditorMode,
   ElementType,
   ControlType,
@@ -128,17 +186,22 @@ export {
   ImageDisplay,
   Command,
   KeyMap,
-  BlockType
+  BlockType,
+  PaperDirection,
+  TableBorder,
+  MaxHeightRatio
 }
 
 // 对外类型
 export type {
   IElement,
+  IEditorData,
   IEditorOption,
   IEditorResult,
   IContextMenuContext,
   IRegisterContextMenu,
   IWatermark,
   INavigateInfo,
-  IBlock
+  IBlock,
+  ILang
 }

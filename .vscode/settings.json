@@ -5,10 +5,13 @@
     "colspan",
     "compositionend",
     "compositionstart",
+    "contenteditable",
     "contextmenu",
     "deletable",
+    "dppx",
     "inputarea",
     "linebreak",
+    "noopener",
     "prismjs",
     "resizer",
     "richtext",
@@ -17,6 +20,7 @@
     "TEXTLIKE",
     "trlist",
     "vite",
+    "vitepress",
     "Yahei"
   ],
   "cSpell.ignorePaths": [

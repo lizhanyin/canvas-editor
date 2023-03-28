@@ -1,11 +1,13 @@
-import { IElementPosition } from './Element'
+import { EditorZone } from '../dataset/enum/Editor'
+import { IElement, IElementPosition } from './Element'
 import { IRow } from './Row'
 
 export interface IDrawOption {
   curIndex?: number;
   isSetCursor?: boolean;
   isSubmitHistory?: boolean;
-  isComputeRowList?: boolean;
+  isCompute?: boolean;
+  isLazy?: boolean;
 }
 
 export interface IDrawImagePayload {
@@ -15,19 +17,20 @@ export interface IDrawImagePayload {
 }
 
 export interface IDrawRowPayload {
+  elementList: IElement[];
   positionList: IElementPosition[];
   rowList: IRow[];
   pageNo: number;
   startIndex: number;
-  startX: number;
-  startY: number;
   innerWidth: number;
+  zone: EditorZone;
 }
 
-export interface IDrawRowResult {
-  x: number;
-  y: number;
-  index: number;
+export interface IDrawPagePayload {
+  elementList: IElement[];
+  positionList: IElementPosition[];
+  rowList: IRow[];
+  pageNo: number;
 }
 
 export interface IPainterOptions {

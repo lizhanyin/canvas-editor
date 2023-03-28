@@ -1,6 +1,6 @@
+import { MaxHeightRatio } from '../dataset/enum/Common'
+
 export interface IHeader {
-  data: string;
-  color?: string;
-  size?: number;
-  font?: string;
+  top?: number;
+  maxHeightRadio?: MaxHeightRatio;
 }

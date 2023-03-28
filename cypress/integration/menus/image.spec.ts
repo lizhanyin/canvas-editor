@@ -10,18 +10,17 @@ describe('菜单-图片', () => {
 
   it('图片', () => {
     cy.getEditor().then((editor: Editor) => {
-      editor.listener.saved = function (payload) {
-        const data = payload.data
-        expect(data[0].type).to.eq('image')
-      }
-
       editor.command.executeSelectAll()
 
       editor.command.executeBackspace()
 
       cy.get('#image').attachFile('test.png')
 
-      cy.get('@canvas').type('{ctrl}s')
+      cy.wait(200).then(() => {
+        const data = editor.command.getValue().data.main
+
+        expect(data[0].type).to.eq('image')
+      })
     })
   })
 

@@ -1,20 +1,38 @@
 import { IEditorOption, IElement, RowFlex } from '..'
 import { ZERO } from '../dataset/constant/Common'
 import { TEXTLIKE_ELEMENT_TYPE } from '../dataset/constant/Element'
+import { ControlComponent } from '../dataset/enum/Control'
 import { ElementType } from '../dataset/enum/Element'
 import { DeepRequired } from '../interface/Common'
-import { zipElementList } from './element'
+import { ITd } from '../interface/table/Td'
+import { ITr } from '../interface/table/Tr'
+import { getElementRowFlex, zipElementList } from './element'
 
 export function writeClipboardItem(text: string, html: string) {
   if (!text || !html) return
   const plainText = new Blob([text], { type: 'text/plain' })
   const htmlText = new Blob([html], { type: 'text/html' })
-  // @ts-ignore
-  const item = new ClipboardItem({
-    [plainText.type]: plainText,
-    [htmlText.type]: htmlText
-  })
-  window.navigator.clipboard.write([item])
+  if (window.ClipboardItem) {
+    // @ts-ignore
+    const item = new ClipboardItem({
+      [plainText.type]: plainText,
+      [htmlText.type]: htmlText
+    })
+    window.navigator.clipboard.write([item])
+  } else {
+    const fakeElement = document.createElement('div')
+    fakeElement.setAttribute('contenteditable', 'true')
+    fakeElement.innerHTML = html
+    document.body.append(fakeElement)
+    // add new range
+    const selection = window.getSelection()
+    const range = document.createRange()
+    range.selectNodeContents(fakeElement)
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    document.execCommand('copy')
+    fakeElement.remove()
+  }
 }
 
 export function writeElementList(elementList: IElement[], options: DeepRequired<IEditorOption>) {
@@ -33,6 +51,8 @@ export function writeElementList(elementList: IElement[], options: DeepRequired<
             const tdDom = document.createElement('td')
             tdDom.style.border = '1px solid'
             const td = tr.tdList[d]
+            tdDom.colSpan = td.colspan
+            tdDom.rowSpan = td.rowspan
             tdDom.innerText = td.value[0]?.value || ''
             trDom.append(tdDom)
           }
@@ -57,6 +77,13 @@ export function writeElementList(elementList: IElement[], options: DeepRequired<
       } else if (element.type === ElementType.SEPARATOR) {
         const hr = document.createElement('hr')
         clipboardDom.append(hr)
+      } else if (element.type === ElementType.CHECKBOX) {
+        const checkbox = document.createElement('input')
+        checkbox.type = 'checkbox'
+        if (element.checkbox?.value) {
+          checkbox.setAttribute('checked', 'true')
+        }
+        clipboardDom.append(checkbox)
       } else if (
         !element.type
         || element.type === ElementType.LATEX
@@ -76,7 +103,8 @@ export function writeElementList(elementList: IElement[], options: DeepRequired<
         dom.innerText = text.replace(new RegExp(`${ZERO}`, 'g'), '\n')
         dom.style.fontFamily = element.font || options.defaultFont
         if (element.rowFlex) {
-          dom.style.textAlign = element.rowFlex
+          const isAlignment = element.rowFlex === RowFlex.ALIGNMENT
+          dom.style.textAlign = isAlignment ? 'justify' : element.rowFlex
         }
         if (element.color) {
           dom.style.color = element.color
@@ -89,6 +117,9 @@ export function writeElementList(elementList: IElement[], options: DeepRequired<
         }
         if (element.size) {
           dom.style.fontSize = `${element.size}px`
+        }
+        if (element.highlight) {
+          dom.style.backgroundColor = element.highlight
         }
         clipboardDom.append(dom)
       }
@@ -105,20 +136,33 @@ export function writeElementList(elementList: IElement[], options: DeepRequired<
   writeClipboardItem(text, html)
 }
 
-export function getElementListByHTML(htmlText: string): IElement[] {
+interface IGetElementListByHTMLOption {
+  innerWidth: number;
+}
+
+export function getElementListByHTML(htmlText: string, options: IGetElementListByHTMLOption): IElement[] {
   const elementList: IElement[] = []
   function findTextNode(dom: Element | Node) {
     if (dom.nodeType === 3) {
-      const style = window.getComputedStyle(dom.parentNode as Element)
+      const parentNode = <HTMLElement>dom.parentNode
+      const rowFlex = getElementRowFlex(parentNode)
       const value = dom.textContent
-      if (value) {
-        elementList.push({
+      const style = window.getComputedStyle(parentNode)
+      if (value && parentNode.nodeName !== 'STYLE') {
+        const element: IElement = {
           value,
           color: style.color,
           bold: Number(style.fontWeight) > 500,
           italic: style.fontStyle.includes('italic'),
           size: Math.floor(Number(style.fontSize.replace('px', '')))
-        })
+        }
+        if (rowFlex !== RowFlex.LEFT) {
+          element.rowFlex = rowFlex
+        }
+        if (style.backgroundColor !== 'rgba(0, 0, 0, 0)') {
+          element.highlight = style.backgroundColor
+        }
+        elementList.push(element)
       }
     } else if (dom.nodeType === 1) {
       const childNodes = dom.childNodes
@@ -142,6 +186,70 @@ export function getElementListByHTML(htmlText: string): IElement[] {
               url: aElement.href
             })
           }
+        } else if (node.nodeName === 'HR') {
+          elementList.push({
+            value: '\n',
+            type: ElementType.SEPARATOR,
+          })
+        } else if (node.nodeName === 'IMG') {
+          const { src, width, height } = node as HTMLImageElement
+          if (src && width && height) {
+            elementList.push({
+              width,
+              height,
+              value: src,
+              type: ElementType.IMAGE
+            })
+          }
+        } else if (node.nodeName === 'TABLE') {
+          const tableElement = node as HTMLTableElement
+          const element: IElement = {
+            type: ElementType.TABLE,
+            value: '\n',
+            colgroup: [],
+            trList: []
+          }
+          // 基础数据
+          tableElement.querySelectorAll('tr').forEach(trElement => {
+            const trHeightStr = window.getComputedStyle(trElement).height.replace('px', '')
+            const tr: ITr = {
+              height: Number(trHeightStr),
+              tdList: []
+            }
+            trElement.querySelectorAll('th,td').forEach(tdElement => {
+              const tableCell = <HTMLTableCellElement>tdElement
+              const td: ITd = {
+                colspan: tableCell.colSpan,
+                rowspan: tableCell.rowSpan,
+                value: [{
+                  value: tableCell.innerText
+                }]
+              }
+              tr.tdList.push(td)
+            })
+            if (tr.tdList.length) {
+              element.trList!.push(tr)
+            }
+          })
+          if (element.trList!.length) {
+            // 列选项数据
+            const tdCount = element.trList![0].tdList.reduce((pre, cur) => pre + cur.colspan, 0)
+            const width = Math.ceil(options.innerWidth / tdCount)
+            for (let i = 0; i < tdCount; i++) {
+              element.colgroup!.push({
+                width
+              })
+            }
+            elementList.push(element)
+          }
+        } else if (node.nodeName === 'INPUT' && (<HTMLInputElement>node).type === ControlComponent.CHECKBOX) {
+          elementList.push({
+            type: ElementType.CHECKBOX,
+            value: '',
+            checkbox: {
+              value: (<HTMLInputElement>node).checked
+            }
+          })
         } else {
           findTextNode(node)
           if (node.nodeType === 1 && n !== childNodes.length - 1) {

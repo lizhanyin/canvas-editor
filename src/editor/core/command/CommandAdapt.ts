@@ -2,10 +2,12 @@ import { WRAP, ZERO } from '../../dataset/constant/Common'
 import { EDITOR_ELEMENT_STYLE_ATTR } from '../../dataset/constant/Element'
 import { defaultWatermarkOption } from '../../dataset/constant/Watermark'
 import { ControlComponent, ImageDisplay } from '../../dataset/enum/Control'
-import { EditorContext, EditorMode, PageMode } from '../../dataset/enum/Editor'
+import { EditorContext, EditorMode, PageMode, PaperDirection } from '../../dataset/enum/Editor'
 import { ElementType } from '../../dataset/enum/Element'
 import { ElementStyleKey } from '../../dataset/enum/ElementStyle'
 import { RowFlex } from '../../dataset/enum/Row'
+import { TableBorder } from '../../dataset/enum/table/Table'
+import { VerticalAlign } from '../../dataset/enum/VerticalAlign'
 import { IDrawImagePayload, IPainterOptions } from '../../interface/Draw'
 import { IEditorOption, IEditorResult } from '../../interface/Editor'
 import { IElement, IElementStyle } from '../../interface/Element'
@@ -23,6 +25,7 @@ import { INavigateInfo, Search } from '../draw/interactive/Search'
 import { TableTool } from '../draw/particle/table/TableTool'
 import { CanvasEvent } from '../event/CanvasEvent'
 import { HistoryManager } from '../history/HistoryManager'
+import { I18n } from '../i18n/I18n'
 import { Position } from '../position/Position'
 import { RangeManager } from '../range/RangeManager'
 import { WorkerManager } from '../worker/WorkerManager'
@@ -42,6 +45,7 @@ export class CommandAdapt {
   private control: Control
   private workerManager: WorkerManager
   private searchManager: Search
+  private i18n: I18n
 
   constructor(draw: Draw) {
     this.draw = draw
@@ -54,6 +58,7 @@ export class CommandAdapt {
     this.control = draw.getControl()
     this.workerManager = draw.getWorkerManager()
     this.searchManager = draw.getSearch()
+    this.i18n = draw.getI18n()
   }
 
   public mode(payload: EditorMode) {
@@ -115,7 +120,7 @@ export class CommandAdapt {
     const isCollapsed = startIndex === endIndex
     this.draw.render({
       curIndex: isCollapsed ? startIndex : undefined,
-      isComputeRowList: false,
+      isCompute: false,
       isSubmitHistory: false,
       isSetCursor: isCollapsed
     })
@@ -182,40 +187,70 @@ export class CommandAdapt {
     this.draw.render({ isSetCursor: false })
   }
 
+  public size(payload: number) {
+    const { minSize, maxSize, defaultSize } = this.options
+    if (payload < minSize || payload > maxSize) return
+    const isReadonly = this.draw.isReadonly()
+    if (isReadonly) return
+    const selection = this.range.getTextLikeSelection()
+    if (!selection || !selection.length) return
+    let isExistUpdate = false
+    selection.forEach(el => {
+      if ((!el.size && payload === defaultSize) || (el.size && el.size === payload)) return
+      el.size = payload
+      isExistUpdate = true
+    })
+    if (isExistUpdate) {
+      this.draw.render({ isSetCursor: false })
+    }
+  }
+
   public sizeAdd() {
     const isReadonly = this.draw.isReadonly()
     if (isReadonly) return
-    const selection = this.range.getSelection()
-    if (!selection) return
-    const lessThanMaxSizeIndex = selection.findIndex(s => !s.size || s.size + 2 <= 72)
-    const { defaultSize } = this.options
-    if (!~lessThanMaxSizeIndex) return
+    const selection = this.range.getTextLikeSelection()
+    if (!selection || !selection.length) return
+    const { defaultSize, maxSize } = this.options
+    let isExistUpdate = false
     selection.forEach(el => {
       if (!el.size) {
         el.size = defaultSize
       }
-      if (el.size + 2 > 72) return
-      el.size += 2
+      if (el.size >= maxSize) return
+      if (el.size + 2 > maxSize) {
+        el.size = maxSize
+      } else {
+        el.size += 2
+      }
+      isExistUpdate = true
     })
-    this.draw.render({ isSetCursor: false })
+    if (isExistUpdate) {
+      this.draw.render({ isSetCursor: false })
+    }
   }
 
   public sizeMinus() {
     const isReadonly = this.draw.isReadonly()
     if (isReadonly) return
-    const selection = this.range.getSelection()
-    if (!selection) return
-    const greaterThanMaxSizeIndex = selection.findIndex(s => !s.size || s.size - 2 >= 8)
-    if (!~greaterThanMaxSizeIndex) return
-    const { defaultSize } = this.options
+    const selection = this.range.getTextLikeSelection()
+    if (!selection || !selection.length) return
+    const { defaultSize, minSize } = this.options
+    let isExistUpdate = false
     selection.forEach(el => {
       if (!el.size) {
         el.size = defaultSize
       }
-      if (el.size - 2 < 8) return
-      el.size -= 2
+      if (el.size <= minSize) return
+      if (el.size - 2 < minSize) {
+        el.size = minSize
+      } else {
+        el.size -= 2
+      }
+      isExistUpdate = true
     })
-    this.draw.render({ isSetCursor: false })
+    if (isExistUpdate) {
+      this.draw.render({ isSetCursor: false })
+    }
   }
 
   public bold() {
@@ -324,7 +359,10 @@ export class CommandAdapt {
     selection.forEach(el => {
       el.color = payload
     })
-    this.draw.render({ isSetCursor: false })
+    this.draw.render({
+      isSetCursor: false,
+      isCompute: false
+    })
   }
 
   public highlight(payload: string) {
@@ -335,7 +373,10 @@ export class CommandAdapt {
     selection.forEach(el => {
       el.highlight = payload
     })
-    this.draw.render({ isSetCursor: false })
+    this.draw.render({
+      isSetCursor: false,
+      isCompute: false
+    })
   }
 
   public rowFlex(payload: RowFlex) {
@@ -396,8 +437,7 @@ export class CommandAdapt {
     const { startIndex, endIndex } = this.range.getRange()
     if (!~startIndex && !~endIndex) return
     const elementList = this.draw.getElementList()
-    const { width, margins } = this.options
-    const innerWidth = width - margins[1] - margins[3]
+    const innerWidth = this.draw.getOriginalInnerWidth()
     // colgroup
     const colgroup: IColgroup[] = []
     const colWidth = innerWidth / col
@@ -425,7 +465,7 @@ export class CommandAdapt {
     }
     const element: IElement = {
       type: ElementType.TABLE,
-      value: ZERO,
+      value: !startIndex ? '' : ZERO,
       colgroup,
       trList
     }
@@ -503,8 +543,7 @@ export class CommandAdapt {
     this.range.setRange(0, 0)
     // 重新渲染
     this.draw.render({ curIndex: 0 })
-    const position = this.position.getOriginalPositionList()
-    this.tableTool.render(element, position[index!])
+    this.tableTool.render()
   }
 
   public insertTableBottomRow() {
@@ -570,8 +609,7 @@ export class CommandAdapt {
     this.range.setRange(0, 0)
     // 重新渲染
     this.draw.render({ curIndex: 0 })
-    const position = this.position.getOriginalPositionList()
-    this.tableTool.render(element, position[index!])
+    this.tableTool.render()
   }
 
   public insertTableLeftCol() {
@@ -628,8 +666,7 @@ export class CommandAdapt {
     this.range.setRange(0, 0)
     // 重新渲染
     this.draw.render({ curIndex: 0 })
-    const position = this.position.getOriginalPositionList()
-    this.tableTool.render(element, position[index!])
+    this.tableTool.render()
   }
 
   public insertTableRightCol() {
@@ -686,8 +723,7 @@ export class CommandAdapt {
     this.range.setRange(0, 0)
     // 重新渲染
     this.draw.render({ curIndex: 0 })
-    const position = this.position.getOriginalPositionList()
-    this.tableTool.render(element, position[index!])
+    this.tableTool.render()
   }
 
   public deleteTableRow() {
@@ -923,8 +959,7 @@ export class CommandAdapt {
     const curIndex = startTd.value.length - 1
     this.range.setRange(curIndex, curIndex)
     this.draw.render()
-    const position = this.position.getOriginalPositionList()
-    this.tableTool.render(element, position[index!])
+    this.tableTool.render()
   }
 
   public cancelMergeTableCell() {
@@ -985,8 +1020,52 @@ export class CommandAdapt {
     const curIndex = curTd.value.length - 1
     this.range.setRange(curIndex, curIndex)
     this.draw.render()
-    const position = this.position.getOriginalPositionList()
-    this.tableTool.render(element, position[index!])
+    this.tableTool.render()
+  }
+
+  public tableTdVerticalAlign(payload: VerticalAlign) {
+    const isReadonly = this.draw.isReadonly()
+    if (isReadonly) return
+    const positionContext = this.position.getPositionContext()
+    if (!positionContext.isTable) return
+    const { index, trIndex, tdIndex } = positionContext
+    const originalElementList = this.draw.getOriginalElementList()
+    const element = originalElementList[index!]
+    const curTd = element?.trList?.[trIndex!]?.tdList?.[tdIndex!]
+    if (
+      !curTd ||
+      curTd.verticalAlign === payload ||
+      (!curTd.verticalAlign && payload === VerticalAlign.TOP)
+    ) {
+      return
+    }
+    // 重设垂直对齐方式
+    curTd.verticalAlign = payload
+    const { endIndex } = this.range.getRange()
+    this.draw.render({
+      curIndex: endIndex
+    })
+  }
+
+  public tableBorderType(payload: TableBorder) {
+    const isReadonly = this.draw.isReadonly()
+    if (isReadonly) return
+    const positionContext = this.position.getPositionContext()
+    if (!positionContext.isTable) return
+    const { index } = positionContext
+    const originalElementList = this.draw.getOriginalElementList()
+    const element = originalElementList[index!]
+    if (
+      (!element.borderType && payload === TableBorder.ALL) ||
+      element.borderType === payload
+    ) {
+      return
+    }
+    element.borderType = payload
+    const { endIndex } = this.range.getRange()
+    this.draw.render({
+      curIndex: endIndex
+    })
   }
 
   public hyperlink(payload: IElement) {
@@ -1089,7 +1168,7 @@ export class CommandAdapt {
     const { endIndex } = this.range.getRange()
     this.draw.render({
       curIndex: endIndex,
-      isComputeRowList: false
+      isCompute: false
     })
   }
 
@@ -1109,7 +1188,7 @@ export class CommandAdapt {
     const { endIndex } = this.range.getRange()
     this.draw.render({
       curIndex: endIndex,
-      isComputeRowList: false
+      isCompute: false
     })
   }
 
@@ -1170,7 +1249,8 @@ export class CommandAdapt {
     options.watermark.font = payload.font || font
     this.draw.render({
       isSetCursor: false,
-      isSubmitHistory: false
+      isSubmitHistory: false,
+      isCompute: false
     })
   }
 
@@ -1182,7 +1262,8 @@ export class CommandAdapt {
       options.watermark = { ...defaultWatermarkOption }
       this.draw.render({
         isSetCursor: false,
-        isSubmitHistory: false
+        isSubmitHistory: false,
+        isCompute: false
       })
     }
   }
@@ -1226,7 +1307,9 @@ export class CommandAdapt {
     if (index === null) return
     this.draw.render({
       isSetCursor: false,
-      isSubmitHistory: false
+      isSubmitHistory: false,
+      isCompute: false,
+      isLazy: false
     })
   }
 
@@ -1235,7 +1318,9 @@ export class CommandAdapt {
     if (index === null) return
     this.draw.render({
       isSetCursor: false,
-      isSubmitHistory: false
+      isSubmitHistory: false,
+      isCompute: false,
+      isLazy: false
     })
   }
 
@@ -1349,12 +1434,15 @@ export class CommandAdapt {
     })
   }
 
-  public print() {
-    const { width, height, scale } = this.options
+  public async print() {
+    const { scale } = this.options
     if (scale !== 1) {
       this.draw.setPageScale(1)
     }
-    printImageBase64(this.draw.getDataURL(), width, height)
+    const width = this.draw.getOriginalWidth()
+    const height = this.draw.getOriginalHeight()
+    const base64List = await this.draw.getDataURL()
+    printImageBase64(base64List, width, height)
     if (scale !== 1) {
       this.draw.setPageScale(scale)
     }
@@ -1390,7 +1478,7 @@ export class CommandAdapt {
     })
   }
 
-  public getImage(): string[] {
+  public getImage(): Promise<string[]> {
     return this.draw.getDataURL()
   }
 
@@ -1437,8 +1525,12 @@ export class CommandAdapt {
     this.draw.setPaperSize(width, height)
   }
 
+  public paperDirection(payload: PaperDirection) {
+    this.draw.setPaperDirection(payload)
+  }
+
   public getPaperMargin(): number[] {
-    return this.draw.getOriginalMargins()
+    return this.options.margins
   }
 
   public setPaperMargin(payload: IMargin) {
@@ -1466,6 +1558,10 @@ export class CommandAdapt {
     this.draw.render({
       curIndex: newIndex
     })
+  }
+
+  public setLocale(payload: string) {
+    this.i18n.setLocale(payload)
   }
 
 }

@@ -2,6 +2,7 @@ import { IRegisterShortcut } from '../../interface/shortcut/Shortcut'
 import { richtextKeys } from './keys/richtextKeys'
 import { Command } from '../command/Command'
 import { Draw } from '../draw/Draw'
+import { isMod } from '../../utils/hotkey'
 
 export class Shortcut {
 
@@ -18,10 +19,18 @@ export class Shortcut {
       ...richtextKeys
     ])
     // 全局快捷键
-    document.addEventListener('keydown', this._globalKeydown.bind(this))
+    this._addEvent()
     // 编辑器快捷键
     const agentDom = draw.getCursor().getAgentDom()
     agentDom.addEventListener('keydown', this._agentKeydown.bind(this))
+  }
+
+  private _addEvent() {
+    document.addEventListener('keydown', this._globalKeydown)
+  }
+
+  public removeEvent() {
+    document.removeEventListener('keydown', this._globalKeydown)
   }
 
   private _addShortcutList(payload: IRegisterShortcut[]) {
@@ -39,7 +48,7 @@ export class Shortcut {
     this._addShortcutList(payload)
   }
 
-  private _globalKeydown(evt: KeyboardEvent) {
+  private _globalKeydown = (evt: KeyboardEvent) => {
     if (!this.globalShortcutList.length) return
     this._execute(evt, this.globalShortcutList)
   }
@@ -53,7 +62,11 @@ export class Shortcut {
     for (let s = 0; s < shortCutList.length; s++) {
       const shortCut = shortCutList[s]
       if (
-        evt.ctrlKey === !!shortCut.ctrl &&
+        (
+          shortCut.mod
+            ? isMod(evt) === !!shortCut.mod
+            : evt.ctrlKey === !!shortCut.ctrl && evt.metaKey === !!shortCut.meta
+        ) &&
         evt.shiftKey === !!shortCut.shift &&
         evt.altKey === !!shortCut.alt &&
         evt.key === shortCut.key

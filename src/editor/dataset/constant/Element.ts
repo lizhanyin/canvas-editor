@@ -1,7 +1,7 @@
 import { ElementType } from '../enum/Element'
 import { IElement } from '../../interface/Element'
 
-export const EDITOR_ELEMENT_STYLE_ATTR = [
+export const EDITOR_ELEMENT_STYLE_ATTR: Array<keyof IElement> = [
   'bold',
   'color',
   'highlight',
@@ -43,6 +43,7 @@ export const EDITOR_ELEMENT_ZIP_ATTR: Array<keyof IElement> = [
   'rowMargin',
   'dashArray',
   'trList',
+  'borderType',
   'width',
   'height',
   'url',

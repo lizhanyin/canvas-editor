@@ -1,5 +1,7 @@
 import { IElement } from '..'
+import { EditorZone } from '../dataset/enum/Editor'
 import { IElementPosition } from './Element'
+import { IRow } from './Row'
 import { ITd } from './table/Td'
 
 export interface ICurrentPosition {
@@ -15,6 +17,7 @@ export interface ICurrentPosition {
   tdId?: string;
   trId?: string;
   tableId?: string;
+  zone?: EditorZone;
 }
 
 export interface IGetPositionByXYPayload {
@@ -37,4 +40,20 @@ export interface IPositionContext {
   tdId?: string;
   trId?: string;
   tableId?: string;
+}
+
+export interface IComputePageRowPositionPayload {
+  positionList: IElementPosition[];
+  rowList: IRow[];
+  pageNo: number;
+  startIndex: number;
+  startX: number;
+  startY: number;
+  innerWidth: number;
+}
+
+export interface IComputePageRowPositionResult {
+  x: number;
+  y: number;
+  index: number;
 }
