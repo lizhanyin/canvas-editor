@@ -1,5 +1,6 @@
 import { WRAP, ZERO } from '../../dataset/constant/Common'
 import { EDITOR_ELEMENT_STYLE_ATTR } from '../../dataset/constant/Element'
+import { titleSizeMapping } from '../../dataset/constant/Title'
 import { defaultWatermarkOption } from '../../dataset/constant/Watermark'
 import { ControlComponent, ImageDisplay } from '../../dataset/enum/Control'
 import { EditorContext, EditorMode, PageMode, PaperDirection } from '../../dataset/enum/Editor'
@@ -7,6 +8,7 @@ import { ElementType } from '../../dataset/enum/Element'
 import { ElementStyleKey } from '../../dataset/enum/ElementStyle'
 import { RowFlex } from '../../dataset/enum/Row'
 import { TableBorder } from '../../dataset/enum/table/Table'
+import { TitleLevel } from '../../dataset/enum/Title'
 import { VerticalAlign } from '../../dataset/enum/VerticalAlign'
 import { IDrawImagePayload, IPainterOptions } from '../../interface/Draw'
 import { IEditorOption, IEditorResult } from '../../interface/Editor'
@@ -17,7 +19,7 @@ import { ITd } from '../../interface/table/Td'
 import { ITr } from '../../interface/table/Tr'
 import { IWatermark } from '../../interface/Watermark'
 import { downloadFile, getUUID } from '../../utils'
-import { formatElementList } from '../../utils/element'
+import { formatElementList, isTextLikeElement } from '../../utils/element'
 import { printImageBase64 } from '../../utils/print'
 import { Control } from '../draw/control/Control'
 import { Draw } from '../draw/Draw'
@@ -379,6 +381,57 @@ export class CommandAdapt {
     })
   }
 
+  public title(payload: TitleLevel | null) {
+    const isReadonly = this.draw.isReadonly()
+    if (isReadonly) return
+    const { startIndex, endIndex } = this.range.getRange()
+    if (!~startIndex && !~endIndex) return
+    // 需要改变的元素列表
+    let changeElementList: IElement[] = []
+    const elementList = this.draw.getElementList()
+    if (startIndex === endIndex) {
+      // 选区行信息
+      const rangeRow = this.range.getRangeParagraph()
+      if (!rangeRow) return
+      const positionList = this.position.getPositionList()
+      for (let p = 0; p < positionList.length; p++) {
+        const position = positionList[p]
+        const rowArray = rangeRow.get(position.pageNo)
+        if (!rowArray) continue
+        if (rowArray.includes(position.rowNo)) {
+          changeElementList.push(elementList[p])
+        }
+      }
+    } else {
+      changeElementList = elementList.slice(startIndex + 1, endIndex + 1)
+    }
+    // 设置值
+    const titleId = getUUID()
+    const titleOptions = this.draw.getOptions().title
+    changeElementList.forEach(el => {
+      if (!el.type && el.value === ZERO) return
+      if (payload) {
+        el.level = payload
+        el.titleId = titleId
+        if (isTextLikeElement(el)) {
+          el.size = titleOptions[titleSizeMapping[payload]]
+          el.bold = true
+        }
+      } else {
+        if (el.titleId) {
+          delete el.titleId
+          delete el.level
+          delete el.size
+          delete el.bold
+        }
+      }
+    })
+    // 光标定位
+    const isSetCursor = startIndex === endIndex
+    const curIndex = isSetCursor ? endIndex : startIndex
+    this.draw.render({ curIndex, isSetCursor })
+  }
+
   public rowFlex(payload: RowFlex) {
     const isReadonly = this.draw.isReadonly()
     if (isReadonly) return
@@ -465,7 +518,7 @@ export class CommandAdapt {
     }
     const element: IElement = {
       type: ElementType.TABLE,
-      value: !startIndex ? '' : ZERO,
+      value: '',
       colgroup,
       trList
     }

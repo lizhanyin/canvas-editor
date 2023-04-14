@@ -37,7 +37,10 @@ import { VerticalAlign } from './dataset/enum/VerticalAlign'
 import { TableBorder } from './dataset/enum/table/Table'
 import { IFooter } from './interface/Footer'
 import { defaultFooterOption } from './dataset/constant/Footer'
-import { MaxHeightRatio } from './dataset/enum/Common'
+import { MaxHeightRatio, NumberType } from './dataset/enum/Common'
+import { ITitleOption } from './interface/Title'
+import { defaultTitleOption } from './dataset/constant/Title'
+import { TitleLevel } from './dataset/enum/Title'
 
 export default class Editor {
 
@@ -74,6 +77,10 @@ export default class Editor {
     const cursorOptions: Required<ICursorOption> = {
       ...defaultCursorOption,
       ...options.cursor
+    }
+    const titleOptions: Required<ITitleOption> = {
+      ...defaultTitleOption,
+      ...options.title
     }
 
     const editorOptions: DeepRequired<IEditorOption> = {
@@ -117,7 +124,8 @@ export default class Editor {
       watermark: waterMarkOptions,
       control: controlOptions,
       checkbox: checkboxOptions,
-      cursor: cursorOptions
+      cursor: cursorOptions,
+      title: titleOptions
     }
     // 数据处理
     let headerElementList: IElement[] = []
@@ -189,7 +197,9 @@ export {
   BlockType,
   PaperDirection,
   TableBorder,
-  MaxHeightRatio
+  MaxHeightRatio,
+  NumberType,
+  TitleLevel
 }
 
 // 对外类型

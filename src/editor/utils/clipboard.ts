@@ -1,6 +1,7 @@
 import { IEditorOption, IElement, RowFlex } from '..'
 import { ZERO } from '../dataset/constant/Common'
-import { TEXTLIKE_ELEMENT_TYPE } from '../dataset/constant/Element'
+import { INLINE_NODE_NAME, TEXTLIKE_ELEMENT_TYPE } from '../dataset/constant/Element'
+import { titleNodeNameMapping, titleOrderNumberMapping } from '../dataset/constant/Title'
 import { ControlComponent } from '../dataset/enum/Control'
 import { ElementType } from '../dataset/enum/Element'
 import { DeepRequired } from '../interface/Common'
@@ -35,9 +36,36 @@ export function writeClipboardItem(text: string, html: string) {
   }
 }
 
+export function convertElementToDom(element: IElement, options: DeepRequired<IEditorOption>): HTMLElement {
+  const isBlock = element.rowFlex === RowFlex.CENTER || element.rowFlex === RowFlex.RIGHT
+  const dom = document.createElement(isBlock ? 'p' : 'span')
+  dom.style.fontFamily = element.font || options.defaultFont
+  if (element.rowFlex) {
+    const isAlignment = element.rowFlex === RowFlex.ALIGNMENT
+    dom.style.textAlign = isAlignment ? 'justify' : element.rowFlex
+  }
+  if (element.color) {
+    dom.style.color = element.color
+  }
+  if (element.bold) {
+    dom.style.fontWeight = '600'
+  }
+  if (element.italic) {
+    dom.style.fontStyle = 'italic'
+  }
+  if (element.size) {
+    dom.style.fontSize = `${element.size}px`
+  }
+  if (element.highlight) {
+    dom.style.backgroundColor = element.highlight
+  }
+  dom.innerText = element.value.replace(new RegExp(`${ZERO}`, 'g'), '\n')
+  return dom
+}
+
 export function writeElementList(elementList: IElement[], options: DeepRequired<IEditorOption>) {
-  const clipboardDom: HTMLDivElement = document.createElement('div')
-  function buildDomFromElementList(payload: IElement[]) {
+  function buildDomFromElementList(payload: IElement[]): HTMLDivElement {
+    const clipboardDom = document.createElement('div')
     for (let e = 0; e < payload.length; e++) {
       const element = payload[e]
       // 构造表格
@@ -53,7 +81,8 @@ export function writeElementList(elementList: IElement[], options: DeepRequired<
             const td = tr.tdList[d]
             tdDom.colSpan = td.colspan
             tdDom.rowSpan = td.rowspan
-            tdDom.innerText = td.value[0]?.value || ''
+            const childDom = buildDomFromElementList(zipElementList(td.value!))
+            tdDom.innerHTML = childDom.innerHTML
             trDom.append(tdDom)
           }
           tableDom.append(trDom)
@@ -61,11 +90,16 @@ export function writeElementList(elementList: IElement[], options: DeepRequired<
         clipboardDom.append(tableDom)
       } else if (element.type === ElementType.HYPERLINK) {
         const a = document.createElement('a')
-        a.innerText = element.valueList![0].value
+        a.innerText = element.valueList!.map(v => v.value).join('')
         if (element.url) {
           a.href = element.url
         }
         clipboardDom.append(a)
+      } else if (element.type === ElementType.TITLE) {
+        const h = document.createElement(`h${titleOrderNumberMapping[element.level!]}`)
+        const childDom = buildDomFromElementList(zipElementList(element.valueList!))
+        h.innerHTML = childDom.innerHTML
+        clipboardDom.append(h)
       } else if (element.type === ElementType.IMAGE) {
         const img = document.createElement('img')
         if (element.value) {
@@ -98,34 +132,18 @@ export function writeElementList(elementList: IElement[], options: DeepRequired<
           text = element.value
         }
         if (!text) continue
-        const isBlock = element.rowFlex === RowFlex.CENTER || element.rowFlex === RowFlex.RIGHT
-        const dom = document.createElement(isBlock ? 'p' : 'span')
+        // 前一个元素是标题，移除首行换行符
+        if (payload[e - 1]?.type === ElementType.TITLE) {
+          text = text.replace(/^\n/, '')
+        }
+        const dom = convertElementToDom(element, options)
         dom.innerText = text.replace(new RegExp(`${ZERO}`, 'g'), '\n')
-        dom.style.fontFamily = element.font || options.defaultFont
-        if (element.rowFlex) {
-          const isAlignment = element.rowFlex === RowFlex.ALIGNMENT
-          dom.style.textAlign = isAlignment ? 'justify' : element.rowFlex
-        }
-        if (element.color) {
-          dom.style.color = element.color
-        }
-        if (element.bold) {
-          dom.style.fontWeight = '600'
-        }
-        if (element.italic) {
-          dom.style.fontStyle = 'italic'
-        }
-        if (element.size) {
-          dom.style.fontSize = `${element.size}px`
-        }
-        if (element.highlight) {
-          dom.style.backgroundColor = element.highlight
-        }
         clipboardDom.append(dom)
       }
     }
+    return clipboardDom
   }
-  buildDomFromElementList(zipElementList(elementList))
+  const clipboardDom = buildDomFromElementList(zipElementList(elementList))
   // 写入剪贴板
   document.body.append(clipboardDom)
   const text = clipboardDom.innerText
@@ -186,6 +204,20 @@ export function getElementListByHTML(htmlText: string, options: IGetElementListB
               url: aElement.href
             })
           }
+        } else if (/H[1-6]/.test(node.nodeName)) {
+          const hElement = node as HTMLTitleElement
+          const valueList = getElementListByHTML(hElement.innerHTML, options)
+          elementList.push({
+            value: '',
+            type: ElementType.TITLE,
+            level: titleNodeNameMapping[node.nodeName],
+            valueList
+          })
+          if (node.nextSibling && !INLINE_NODE_NAME.includes(node.nextSibling.nodeName)) {
+            elementList.push({
+              value: '\n'
+            })
+          }
         } else if (node.nodeName === 'HR') {
           elementList.push({
             value: '\n',
@@ -218,12 +250,11 @@ export function getElementListByHTML(htmlText: string, options: IGetElementListB
             }
             trElement.querySelectorAll('th,td').forEach(tdElement => {
               const tableCell = <HTMLTableCellElement>tdElement
+              const valueList = getElementListByHTML(tableCell.innerHTML, options)
               const td: ITd = {
                 colspan: tableCell.colSpan,
                 rowspan: tableCell.rowSpan,
-                value: [{
-                  value: tableCell.innerText
-                }]
+                value: valueList
               }
               tr.tdList.push(td)
             })

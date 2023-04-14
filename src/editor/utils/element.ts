@@ -4,9 +4,22 @@ import { LaTexParticle } from '../core/draw/particle/latex/LaTexParticle'
 import { defaultCheckboxOption } from '../dataset/constant/Checkbox'
 import { ZERO } from '../dataset/constant/Common'
 import { defaultControlOption } from '../dataset/constant/Control'
-import { EDITOR_ELEMENT_ZIP_ATTR } from '../dataset/constant/Element'
+import { EDITOR_ELEMENT_ZIP_ATTR, TEXTLIKE_ELEMENT_TYPE } from '../dataset/constant/Element'
+import { titleSizeMapping } from '../dataset/constant/Title'
 import { ControlComponent, ControlType } from '../dataset/enum/Control'
 import { ITd } from '../interface/table/Td'
+
+export function unzipElementList(elementList: IElement[]): IElement[] {
+  const result: IElement[] = []
+  for (let v = 0; v < elementList.length; v++) {
+    const valueItem = elementList[v]
+    const textList = splitText(valueItem.value)
+    for (let d = 0; d < textList.length; d++) {
+      result.push({ ...valueItem, value: textList[d] })
+    }
+  }
+  return result
+}
 
 interface IFormatElementListOption {
   isHandleFirstElement?: boolean;
@@ -37,6 +50,9 @@ export function formatElementList(elementList: IElement[], options: IFormatEleme
           if (!tr.minHeight || tr.minHeight < editorOptions.defaultTrMinHeight) {
             tr.minHeight = editorOptions.defaultTrMinHeight
           }
+          if (tr.height < tr.minHeight) {
+            tr.height = tr.minHeight
+          }
           for (let d = 0; d < tr.tdList.length; d++) {
             const td = tr.tdList[d]
             const tdId = getUUID()
@@ -55,19 +71,12 @@ export function formatElementList(elementList: IElement[], options: IFormatEleme
         }
       }
     } else if (el.type === ElementType.HYPERLINK) {
-      const valueList = el.valueList || []
       // 移除父节点
       elementList.splice(i, 1)
-      // 追加字节点
+      // 元素展开
+      const valueList = unzipElementList(el.valueList || [])
+      // 追加节点
       if (valueList.length) {
-        // 元素展开
-        if (valueList[0].value.length > 1) {
-          const deleteValue = valueList.splice(0, 1)[0]
-          const deleteTextList = splitText(deleteValue.value)
-          for (let d = 0; d < deleteTextList.length; d++) {
-            valueList.splice(d, 0, { ...deleteValue, value: deleteTextList[d] })
-          }
-        }
         const hyperlinkId = getUUID()
         for (let v = 0; v < valueList.length; v++) {
           const value = valueList[v]
@@ -80,25 +89,49 @@ export function formatElementList(elementList: IElement[], options: IFormatEleme
       }
       i--
     } else if (el.type === ElementType.DATE) {
-      const valueList = el.valueList || []
       // 移除父节点
       elementList.splice(i, 1)
-      // 追加字节点
+      // 元素展开
+      const valueList = unzipElementList(el.valueList || [])
+      // 追加节点
       if (valueList.length) {
-        // 元素展开
-        if (valueList[0].value.length > 1) {
-          const deleteValue = valueList.splice(0, 1)[0]
-          const deleteTextList = splitText(deleteValue.value)
-          for (let d = 0; d < deleteTextList.length; d++) {
-            valueList.splice(d, 0, { ...deleteValue, value: deleteTextList[d] })
-          }
-        }
         const dateId = getUUID()
         for (let v = 0; v < valueList.length; v++) {
           const value = valueList[v]
           value.type = el.type
           value.dateFormat = el.dateFormat
           value.dateId = dateId
+          elementList.splice(i, 0, value)
+          i++
+        }
+      }
+      i--
+    } else if (el.type === ElementType.TITLE) {
+      // 移除父节点
+      elementList.splice(i, 1)
+      // 格式化元素
+      const valueList = el.valueList || []
+      formatElementList(valueList, {
+        ...options,
+        isHandleFirstElement: false
+      })
+      // 追加节点
+      if (valueList.length) {
+        const titleId = getUUID()
+        const titleOptions = editorOptions.title
+        for (let v = 0; v < valueList.length; v++) {
+          const value = valueList[v]
+          value.titleId = titleId
+          value.level = el.level
+          // 文本型元素设置字体及加粗
+          if (isTextLikeElement(value)) {
+            if (!value.size) {
+              value.size = titleOptions[titleSizeMapping[value.level!]]
+            }
+            if (value.bold === undefined) {
+              value.bold = true
+            }
+          }
           elementList.splice(i, 0, value)
           i++
         }
@@ -367,6 +400,28 @@ export function zipElementList(payload: IElement[]): IElement[] {
       }
       dateElement.valueList = zipElementList(valueList)
       element = dateElement
+    } else if (element.titleId && element.level) {
+      // 标题处理
+      const titleId = element.titleId
+      const level = element.level
+      const titleElement: IElement = {
+        type: ElementType.TITLE,
+        value: '',
+        level
+      }
+      const valueList: IElement[] = []
+      while (e < elementList.length) {
+        const titleE = elementList[e]
+        if (titleId !== titleE.titleId) {
+          e--
+          break
+        }
+        delete titleE.level
+        valueList.push(titleE)
+        e++
+      }
+      titleElement.valueList = zipElementList(valueList)
+      element = titleElement
     } else if (element.type === ElementType.CONTROL) {
       // 控件处理
       const controlId = element.controlId
@@ -433,4 +488,8 @@ export function getElementRowFlex(node: HTMLElement) {
     default:
       return RowFlex.LEFT
   }
+}
+
+export function isTextLikeElement(element: IElement): boolean {
+  return !element.type || TEXTLIKE_ELEMENT_TYPE.includes(element.type)
 }

@@ -4,7 +4,7 @@ import { TEXTLIKE_ELEMENT_TYPE } from '../../dataset/constant/Element'
 import { ControlComponent } from '../../dataset/enum/Control'
 import { IEditorOption } from '../../interface/Editor'
 import { IElement } from '../../interface/Element'
-import { IRange, RangeRowMap } from '../../interface/Range'
+import { IRange, RangeRowArray, RangeRowMap } from '../../interface/Range'
 import { Draw } from '../draw/Draw'
 import { HistoryManager } from '../history/HistoryManager'
 import { Listener } from '../listener/Listener'
@@ -72,6 +72,52 @@ export class RangeManager {
     return rangeRow
   }
 
+  // 获取选取段落信息
+  public getRangeParagraph(): RangeRowArray | null {
+    const { startIndex, endIndex } = this.range
+    if (!~startIndex && !~endIndex) return null
+    const positionList = this.position.getPositionList()
+    const elementList = this.draw.getElementList()
+    const rangeRow: RangeRowArray = new Map()
+    // 向上查找
+    let start = startIndex
+    while (start > 0) {
+      if (
+        positionList[start].value === ZERO ||
+        (elementList[start].titleId !== elementList[start - 1]?.titleId)
+      ) break
+      const { pageNo, rowNo } = positionList[start]
+      let rowArray = rangeRow.get(pageNo)
+      if (!rowArray) {
+        rowArray = []
+        rangeRow.set(pageNo, rowArray)
+      }
+      if (!rowArray.includes(rowNo)) {
+        rowArray.unshift(rowNo)
+      }
+      start--
+    }
+    // 向下查找
+    let end = endIndex
+    while (end < positionList.length) {
+      if (
+        positionList[end].value === ZERO ||
+        elementList[end].titleId !== elementList[end + 1]?.titleId
+      ) break
+      const { pageNo, rowNo } = positionList[end]
+      let rowArray = rangeRow.get(pageNo)
+      if (!rowArray) {
+        rowArray = []
+        rangeRow.set(pageNo, rowArray)
+      }
+      if (!rowArray.includes(rowNo)) {
+        rowArray.push(rowNo)
+      }
+      end++
+    }
+    return rangeRow
+  }
+
   public getIsPointInRange(x: number, y: number): boolean {
     const { startIndex, endIndex } = this.range
     const positionList = this.position.getPositionList()
@@ -129,15 +175,27 @@ export class RangeManager {
 
   public setRangeStyle() {
     if (!this.listener.rangeStyleChange) return
-    let curElementList = this.getSelection()
-    if (!curElementList) {
-      const elementList = this.draw.getElementList()
-      const { endIndex } = this.range
+    // 结束光标位置
+    const { endIndex, isCrossRowCol } = this.range
+    let curElement: IElement
+    if (isCrossRowCol) {
+      // 单元格选择以当前表格定位
+      const originalElementList = this.draw.getOriginalElementList()
+      const positionContext = this.position.getPositionContext()
+      curElement = originalElementList[positionContext.index!]
+    } else {
       const index = ~endIndex ? endIndex : 0
-      curElementList = [elementList[index]]
+      // 行首以第一个非换行符元素定位
+      const elementList = this.draw.getElementList()
+      const endElement = elementList[index]
+      const endNextElement = elementList[index + 1]
+      curElement = endElement.value === ZERO && endNextElement
+        ? endNextElement
+        : endElement
     }
-    const curElement = curElementList[curElementList.length - 1]
     if (!curElement) return
+    // 选取元素列表
+    const curElementList = this.getSelection() || [curElement]
     // 类型
     const type = curElement.type || ElementType.TEXT
     // 富文本
@@ -152,6 +210,7 @@ export class RangeManager {
     const rowFlex = curElement.rowFlex || null
     const rowMargin = curElement.rowMargin || this.options.defaultRowMargin
     const dashArray = curElement.dashArray || []
+    const level = curElement.level || null
     // 菜单
     const painter = !!this.draw.getPainterStyle()
     const undo = this.historyManager.isCanUndo()
@@ -171,7 +230,8 @@ export class RangeManager {
       highlight,
       rowFlex,
       rowMargin,
-      dashArray
+      dashArray,
+      level
     })
   }
 
@@ -198,7 +258,8 @@ export class RangeManager {
       highlight: null,
       rowFlex: null,
       rowMargin,
-      dashArray: []
+      dashArray: [],
+      level: null
     })
   }
 

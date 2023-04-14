@@ -28,14 +28,14 @@ new Editor(document.querySelector(".canvas-editor"), [
 
 ## next features
 
-1. line beginning punctuation
+1. list
 2. improve performance
 3. control rules
 4. table paging
 
 ## snapshot
 
-![image](https://github.com/Hufe921/canvas-editor/blob/main/src/assets/snapshots/main_v0.9.23.png)
+![image](https://github.com/Hufe921/canvas-editor/blob/main/src/assets/snapshots/main_v0.9.30.png)
 
 ## install
 
@@ -43,12 +43,12 @@ new Editor(document.querySelector(".canvas-editor"), [
 
 ## dev
 
-`yarn run dev`
+`npm run dev`
 
 ## build
 
 #### app
-`yarn run build`
+`npm run build`
 
 #### lib
-`yarn run lib`
+`npm run lib`
