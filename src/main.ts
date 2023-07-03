@@ -1,10 +1,11 @@
 import { data, options } from './mock'
 import './style.css'
 import prism from 'prismjs'
-import Editor, { BlockType, Command, ControlType, EditorMode, ElementType, IBlock, IElement, KeyMap, PageMode, PaperDirection, RowFlex, TitleLevel } from './editor'
+import Editor, { BlockType, Command, ControlType, EditorMode, ElementType, IBlock, ICatalogItem, IElement, KeyMap, ListStyle, ListType, PageMode, PaperDirection, RowFlex, TitleLevel } from './editor'
 import { Dialog } from './components/dialog/Dialog'
 import { formatPrismToken } from './utils/prism'
 import { Signature } from './components/signature/Signature'
+import { debounce } from './utils'
 
 window.onload = function () {
   const isApple = typeof navigator !== 'undefined' && /Mac OS X/.test(navigator.userAgent)
@@ -37,6 +38,15 @@ window.onload = function () {
   console.log('实例: ', instance)
   // cypress使用
   Reflect.set(window, 'editor', instance)
+
+  // 菜单弹窗销毁
+  window.addEventListener('click', (evt) => {
+    const visibleDom = document.querySelector('.visible')
+    if (!visibleDom || visibleDom.contains(<Node>evt.target)) return
+    visibleDom.classList.remove('visible')
+  }, {
+    capture: true
+  })
 
   // 2. | 撤销 | 重做 | 格式刷 | 清除格式 |
   const undoDom = document.querySelector<HTMLDivElement>('.menu-item__undo')!
@@ -178,6 +188,10 @@ window.onload = function () {
   const titleDom = document.querySelector<HTMLDivElement>('.menu-item__title')!
   const titleSelectDom = titleDom.querySelector<HTMLDivElement>('.select')!
   const titleOptionDom = titleDom.querySelector<HTMLDivElement>('.options')!
+  titleOptionDom.querySelectorAll('li').forEach((li, index) => {
+    li.title = `Ctrl+${isApple ? 'Option' : 'Alt'}+${index}`
+  })
+
   titleDom.onclick = function () {
     console.log('title')
     titleOptionDom.classList.toggle('visible')
@@ -192,28 +206,28 @@ window.onload = function () {
   leftDom.title = `左对齐(${isApple ? '⌘' : 'Ctrl'}+L)`
   leftDom.onclick = function () {
     console.log('left')
-    instance.command.executeLeft()
+    instance.command.executeRowFlex(RowFlex.LEFT)
   }
 
   const centerDom = document.querySelector<HTMLDivElement>('.menu-item__center')!
   centerDom.title = `居中对齐(${isApple ? '⌘' : 'Ctrl'}+E)`
   centerDom.onclick = function () {
     console.log('center')
-    instance.command.executeCenter()
+    instance.command.executeRowFlex(RowFlex.CENTER)
   }
 
   const rightDom = document.querySelector<HTMLDivElement>('.menu-item__right')!
   rightDom.title = `右对齐(${isApple ? '⌘' : 'Ctrl'}+R)`
   rightDom.onclick = function () {
     console.log('right')
-    instance.command.executeRight()
+    instance.command.executeRowFlex(RowFlex.RIGHT)
   }
 
   const alignmentDom = document.querySelector<HTMLDivElement>('.menu-item__alignment')!
   alignmentDom.title = `两端对齐(${isApple ? '⌘' : 'Ctrl'}+J)`
   alignmentDom.onclick = function () {
     console.log('alignment')
-    instance.command.executeAlignment()
+    instance.command.executeRowFlex(RowFlex.ALIGNMENT)
   }
 
   const rowMarginDom = document.querySelector<HTMLDivElement>('.menu-item__row-margin')!
@@ -225,6 +239,20 @@ window.onload = function () {
   rowOptionDom.onclick = function (evt) {
     const li = evt.target as HTMLLIElement
     instance.command.executeRowMargin(Number(li.dataset.rowmargin!))
+  }
+
+  const listDom = document.querySelector<HTMLDivElement>('.menu-item__list')!
+  listDom.title = `列表(${isApple ? '⌘' : 'Ctrl'}+Shift+U)`
+  const listOptionDom = listDom.querySelector<HTMLDivElement>('.options')!
+  listDom.onclick = function () {
+    console.log('list')
+    listOptionDom.classList.toggle('visible')
+  }
+  listOptionDom.onclick = function (evt) {
+    const li = evt.target as HTMLLIElement
+    const listType = <ListType>li.dataset.listType || null
+    const listStyle = <ListStyle><unknown>li.dataset.listStyle
+    instance.command.executeList(listType, listStyle)
   }
 
   // 4. | 表格 | 图片 | 超链接 | 分割线 | 水印 | 代码块 | 分隔符 | 控件 | 复选框 | LaTeX | 日期选择器
@@ -826,7 +854,54 @@ window.onload = function () {
     instance.command.executePrint()
   }
 
-  // 6. 页面模式 | 纸张缩放 | 纸张大小 | 纸张方向 | 页边距 | 全屏
+  // 6. 目录显隐 | 页面模式 | 纸张缩放 | 纸张大小 | 纸张方向 | 页边距 | 全屏
+  async function updateCatalog() {
+    const catalog = await instance.command.getCatalog()
+    const catalogMainDom = document.querySelector<HTMLDivElement>('.catalog__main')!
+    catalogMainDom.innerHTML = ''
+    if (catalog) {
+      const appendCatalog = (parent: HTMLDivElement, catalogItems: ICatalogItem[]) => {
+        for (let c = 0; c < catalogItems.length; c++) {
+          const catalogItem = catalogItems[c]
+          const catalogItemDom = document.createElement('div')
+          catalogItemDom.classList.add('catalog-item')
+          // 渲染
+          const catalogItemContentDom = document.createElement('div')
+          catalogItemContentDom.classList.add('catalog-item__content')
+          const catalogItemContentSpanDom = document.createElement('span')
+          catalogItemContentSpanDom.innerText = catalogItem.name
+          catalogItemContentDom.append(catalogItemContentSpanDom)
+          // 定位
+          catalogItemContentDom.onclick = () => {
+            instance.command.executeLocationCatalog(catalogItem.id)
+          }
+          catalogItemDom.append(catalogItemContentDom)
+          if (catalogItem.subCatalog && catalogItem.subCatalog.length) {
+            appendCatalog(catalogItemDom, catalogItem.subCatalog)
+          }
+          // 追加
+          parent.append(catalogItemDom)
+        }
+      }
+      appendCatalog(catalogMainDom, catalog)
+    }
+  }
+  let isCatalogShow = true
+  const catalogDom = document.querySelector<HTMLElement>('.catalog')!
+  const catalogModeDom = document.querySelector<HTMLDivElement>('.catalog-mode')!
+  const catalogHeaderCloseDom = document.querySelector<HTMLDivElement>('.catalog__header__close')!
+  const switchCatalog = () => {
+    isCatalogShow = !isCatalogShow
+    if (isCatalogShow) {
+      catalogDom.style.display = 'block'
+      updateCatalog()
+    } else {
+      catalogDom.style.display = 'none'
+    }
+  }
+  catalogModeDom.onclick = switchCatalog
+  catalogHeaderCloseDom.onclick = switchCatalog
+
   const pageModeDom = document.querySelector<HTMLDivElement>('.page-mode')!
   const pageModeOptionsDom = pageModeDom.querySelector<HTMLDivElement>('.options')!
   pageModeDom.onclick = function () {
@@ -1080,6 +1155,21 @@ window.onload = function () {
       titleSelectDom.innerText = '正文'
       titleOptionDom.querySelector('li:first-child')!.classList.add('active')
     }
+
+    // 列表
+    listOptionDom.querySelectorAll<HTMLLIElement>('li').forEach(li => li.classList.remove('active'))
+    if (payload.listType) {
+      listDom.classList.add('active')
+      const listType = payload.listType
+      const listStyle = payload.listType === ListType.OL ? ListStyle.DECIMAL : payload.listType
+      const curListDom = listOptionDom
+        .querySelector<HTMLLIElement>(`[data-list-type='${listType}'][data-list-style='${listStyle}']`)
+      if (curListDom) {
+        curListDom.classList.add('active')
+      }
+    } else {
+      listDom.classList.remove('active')
+    }
   }
 
   instance.listener.visiblePageNoListChange = function (payload) {
@@ -1125,10 +1215,15 @@ window.onload = function () {
     activeMode.classList.add('active')
   }
 
-  instance.listener.contentChange = async function () {
+  instance.listener.contentChange = debounce(async function () {
+    // 字数
     const wordCount = await instance.command.getWordCount()
     document.querySelector<HTMLSpanElement>('.word-count')!.innerText = `${wordCount || 0}`
-  }
+    // 目录
+    if (isCatalogShow) {
+      updateCatalog()
+    }
+  }, 200)
 
   instance.listener.saved = function (payload) {
     console.log('elementList: ', payload)
@@ -1156,6 +1251,16 @@ window.onload = function () {
             }])
           }
         })
+      }
+    },
+    {
+      name: '格式整理',
+      icon: 'word-tool',
+      when: (payload) => {
+        return !payload.isReadonly
+      },
+      callback: (command: Command) => {
+        command.executeWordTool()
       }
     }
   ])

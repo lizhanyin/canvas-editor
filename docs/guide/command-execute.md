@@ -208,36 +208,20 @@ instance.command.executeHighlight()
 instance.command.executeTitle(TitleLevel | null)
 ```
 
-## executeLeft
-功能：行居左
+## executeList
+功能：列表设置
 
 用法：
 ```javascript
-instance.command.executeLeft()
+instance.command.executeList(listType: ListType | null, listStyle?: ListStyle)
 ```
 
-## executeCenter
-功能：行居中
+## executeRowFlex
+功能：行对齐
 
 用法：
 ```javascript
-instance.command.executeCenter()
-```
-
-## executeRight
-功能：行居右
-
-用法：
-```javascript
-instance.command.executeRight()
-```
-
-## executeAlignment
-功能：行两端对齐
-
-用法：
-```javascript
-instance.command.executeAlignment()
+instance.command.executeRowFlex(rowFlex: RowFlex)
 ```
 
 ## executeRowMargin
@@ -342,6 +326,14 @@ instance.command.executeTableTdVerticalAlign(payload: VerticalAlign)
 用法：
 ```javascript
 instance.command.executeTableBorderType(payload: TableBorder)
+```
+
+## executeTableTdBackgroundColor
+功能：表格单元格背景色
+
+用法：
+```javascript
+instance.command.executeTableTdBackgroundColor(payload: string)
 ```
 
 ## executeImage
@@ -559,6 +551,14 @@ instance.command.executeSetPaperMargin([top: number, right: number, bottom: numb
 instance.command.executeInsertElementList(elementList: IElement[])
 ```
 
+## executeSetValue
+功能：设置编辑器数据
+
+用法：
+```javascript
+instance.command.executeSetValue(payload: Partial<IEditorData>)
+```
+
 ## executeRemoveControl
 功能：删除控件
 
@@ -573,4 +573,20 @@ instance.command.executeRemoveControl()
 用法：
 ```javascript
 instance.command.executeSetLocale(locale: string)
+```
+
+## executeLocationCatalog
+功能：定位目录位置
+
+用法：
+```javascript
+instance.command.executeLocationCatalog(titleId: string)
+```
+
+## executeWordTool
+功能：文字工具（删除空行、行首空格）
+
+用法：
+```javascript
+instance.command.executeWordTool()
 ```

@@ -1,10 +1,10 @@
-import { deepClone, getUUID, splitText } from '.'
+import { cloneProperty, deepClone, getUUID, splitText } from '.'
 import { ElementType, IEditorOption, IElement, RowFlex } from '..'
 import { LaTexParticle } from '../core/draw/particle/latex/LaTexParticle'
 import { defaultCheckboxOption } from '../dataset/constant/Checkbox'
 import { ZERO } from '../dataset/constant/Common'
 import { defaultControlOption } from '../dataset/constant/Control'
-import { EDITOR_ELEMENT_ZIP_ATTR, TEXTLIKE_ELEMENT_TYPE } from '../dataset/constant/Element'
+import { EDITOR_ELEMENT_CONTEXT_ATTR, EDITOR_ELEMENT_ZIP_ATTR, TABLE_CONTEXT_ATTR, TEXTLIKE_ELEMENT_TYPE } from '../dataset/constant/Element'
 import { titleSizeMapping } from '../dataset/constant/Title'
 import { ControlComponent, ControlType } from '../dataset/enum/Control'
 import { ITd } from '../interface/table/Td'
@@ -31,7 +31,8 @@ export function formatElementList(elementList: IElement[], options: IFormatEleme
     isHandleFirstElement: true,
     ...options
   }
-  if (isHandleFirstElement && elementList[0]?.value !== ZERO) {
+  const startElement = elementList[0]
+  if (isHandleFirstElement && startElement?.value !== ZERO && startElement?.value !== '\n') {
     elementList.unshift({
       value: ZERO
     })
@@ -39,7 +40,62 @@ export function formatElementList(elementList: IElement[], options: IFormatEleme
   let i = 0
   while (i < elementList.length) {
     let el = elementList[i]
-    if (el.type === ElementType.TABLE) {
+    // 优先处理虚拟元素
+    if (el.type === ElementType.TITLE) {
+      // 移除父节点
+      elementList.splice(i, 1)
+      // 格式化元素
+      const valueList = el.valueList || []
+      formatElementList(valueList, {
+        ...options,
+        isHandleFirstElement: false
+      })
+      // 追加节点
+      if (valueList.length) {
+        const titleId = getUUID()
+        const titleOptions = editorOptions.title
+        for (let v = 0; v < valueList.length; v++) {
+          const value = valueList[v]
+          if (el.level) {
+            value.titleId = titleId
+            value.level = el.level
+          }
+          // 文本型元素设置字体及加粗
+          if (isTextLikeElement(value)) {
+            if (!value.size) {
+              value.size = titleOptions[titleSizeMapping[value.level!]]
+            }
+            if (value.bold === undefined) {
+              value.bold = true
+            }
+          }
+          elementList.splice(i, 0, value)
+          i++
+        }
+      }
+      i--
+    } else if (el.type === ElementType.LIST) {
+      // 移除父节点
+      elementList.splice(i, 1)
+      // 格式化元素
+      const valueList = el.valueList || []
+      formatElementList(valueList, {
+        ...options
+      })
+      // 追加节点
+      if (valueList.length) {
+        const listId = getUUID()
+        for (let v = 0; v < valueList.length; v++) {
+          const value = valueList[v]
+          value.listId = listId
+          value.listType = el.listType
+          value.listStyle = el.listStyle
+          elementList.splice(i, 0, value)
+          i++
+        }
+      }
+      i--
+    } else if (el.type === ElementType.TABLE) {
       const tableId = getUUID()
       el.id = tableId
       if (el.trList) {
@@ -101,37 +157,6 @@ export function formatElementList(elementList: IElement[], options: IFormatEleme
           value.type = el.type
           value.dateFormat = el.dateFormat
           value.dateId = dateId
-          elementList.splice(i, 0, value)
-          i++
-        }
-      }
-      i--
-    } else if (el.type === ElementType.TITLE) {
-      // 移除父节点
-      elementList.splice(i, 1)
-      // 格式化元素
-      const valueList = el.valueList || []
-      formatElementList(valueList, {
-        ...options,
-        isHandleFirstElement: false
-      })
-      // 追加节点
-      if (valueList.length) {
-        const titleId = getUUID()
-        const titleOptions = editorOptions.title
-        for (let v = 0; v < valueList.length; v++) {
-          const value = valueList[v]
-          value.titleId = titleId
-          value.level = el.level
-          // 文本型元素设置字体及加粗
-          if (isTextLikeElement(value)) {
-            if (!value.size) {
-              value.size = titleOptions[titleSizeMapping[value.level!]]
-            }
-            if (value.bold === undefined) {
-              value.bold = true
-            }
-          }
           elementList.splice(i, 0, value)
           i++
         }
@@ -337,8 +362,56 @@ export function zipElementList(payload: IElement[]): IElement[] {
       e++
       continue
     }
-    // 表格、超链接、日期、控件特殊处理
-    if (element.type === ElementType.TABLE) {
+    // 优先处理虚拟元素，后表格、超链接、日期、控件特殊处理
+    if (element.titleId && element.level) {
+      // 标题处理
+      const titleId = element.titleId
+      const level = element.level
+      const titleElement: IElement = {
+        type: ElementType.TITLE,
+        value: '',
+        level
+      }
+      const valueList: IElement[] = []
+      while (e < elementList.length) {
+        const titleE = elementList[e]
+        if (titleId !== titleE.titleId) {
+          e--
+          break
+        }
+        delete titleE.level
+        valueList.push(titleE)
+        e++
+      }
+      titleElement.valueList = zipElementList(valueList)
+      element = titleElement
+    } else if (element.listId && element.listType) {
+      // 列表处理
+      const listId = element.listId
+      const listType = element.listType
+      const listStyle = element.listStyle
+      const listElement: IElement = {
+        type: ElementType.LIST,
+        value: '',
+        listId,
+        listType,
+        listStyle
+      }
+      const valueList: IElement[] = []
+      while (e < elementList.length) {
+        const listE = elementList[e]
+        if (listId !== listE.listId) {
+          e--
+          break
+        }
+        delete listE.listType
+        delete listE.listStyle
+        valueList.push(listE)
+        e++
+      }
+      listElement.valueList = zipElementList(valueList)
+      element = listElement
+    } else if (element.type === ElementType.TABLE) {
       if (element.trList) {
         for (let t = 0; t < element.trList.length; t++) {
           const tr = element.trList[t]
@@ -352,6 +425,9 @@ export function zipElementList(payload: IElement[]): IElement[] {
             }
             if (td.verticalAlign) {
               zipTd.verticalAlign = td.verticalAlign
+            }
+            if (td.backgroundColor) {
+              zipTd.backgroundColor = td.backgroundColor
             }
             tr.tdList[d] = zipTd
           }
@@ -400,28 +476,6 @@ export function zipElementList(payload: IElement[]): IElement[] {
       }
       dateElement.valueList = zipElementList(valueList)
       element = dateElement
-    } else if (element.titleId && element.level) {
-      // 标题处理
-      const titleId = element.titleId
-      const level = element.level
-      const titleElement: IElement = {
-        type: ElementType.TITLE,
-        value: '',
-        level
-      }
-      const valueList: IElement[] = []
-      while (e < elementList.length) {
-        const titleE = elementList[e]
-        if (titleId !== titleE.titleId) {
-          e--
-          break
-        }
-        delete titleE.level
-        valueList.push(titleE)
-        e++
-      }
-      titleElement.valueList = zipElementList(valueList)
-      element = titleElement
     } else if (element.type === ElementType.CONTROL) {
       // 控件处理
       const controlId = element.controlId
@@ -450,7 +504,12 @@ export function zipElementList(payload: IElement[]): IElement[] {
     }
     // 组合元素
     const pickElement = pickElementAttr(element)
-    if (!element.type || element.type === ElementType.TEXT) {
+    if (
+      !element.type
+      || element.type === ElementType.TEXT
+      || element.type === ElementType.SUBSCRIPT
+      || element.type === ElementType.SUPERSCRIPT
+    ) {
       while (e < elementList.length) {
         const nextElement = elementList[e + 1]
         e++
@@ -492,4 +551,39 @@ export function getElementRowFlex(node: HTMLElement) {
 
 export function isTextLikeElement(element: IElement): boolean {
   return !element.type || TEXTLIKE_ELEMENT_TYPE.includes(element.type)
+}
+
+export function getAnchorElement(elementList: IElement[], anchorIndex: number): IElement | null {
+  const anchorElement = elementList[anchorIndex]
+  if (!anchorElement) return null
+  const anchorNextElement = elementList[anchorIndex + 1]
+  // 非列表元素 && 当前元素是换行符 && 下一个元素不是换行符 则以下一个元素作为参考元素
+  return !anchorElement.listId && anchorElement.value === ZERO && anchorNextElement && anchorNextElement.value !== ZERO
+    ? anchorNextElement
+    : anchorElement
+}
+
+export interface IFormatElementContextOption {
+  isBreakWhenWrap: boolean;
+}
+
+export function formatElementContext(sourceElementList: IElement[], formatElementList: IElement[], anchorIndex: number, options?: IFormatElementContextOption) {
+  const copyElement = getAnchorElement(sourceElementList, anchorIndex)
+  if (!copyElement) return
+  const { isBreakWhenWrap = false } = options || {}
+  for (let e = 0; e < formatElementList.length; e++) {
+    const targetElement = formatElementList[e]
+    if (isBreakWhenWrap && !copyElement.listId && /^\n/.test(targetElement.value)) break
+    // 定位元素非列表，无需处理粘贴列表的上下文
+    if (!copyElement.listId && targetElement.type === ElementType.LIST) {
+      targetElement.valueList?.forEach((valueItem) => {
+        cloneProperty<IElement>(TABLE_CONTEXT_ATTR, copyElement, valueItem)
+      })
+      continue
+    }
+    if (targetElement.valueList?.length) {
+      formatElementContext(sourceElementList, targetElement.valueList, anchorIndex)
+    }
+    cloneProperty<IElement>(EDITOR_ELEMENT_CONTEXT_ATTR, copyElement, targetElement)
+  }
 }

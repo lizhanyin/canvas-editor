@@ -5,6 +5,7 @@ import { ControlComponent } from '../../dataset/enum/Control'
 import { IEditorOption } from '../../interface/Editor'
 import { IElement } from '../../interface/Element'
 import { IRange, RangeRowArray, RangeRowMap } from '../../interface/Range'
+import { getAnchorElement } from '../../utils/element'
 import { Draw } from '../draw/Draw'
 import { HistoryManager } from '../history/HistoryManager'
 import { Listener } from '../listener/Listener'
@@ -37,6 +38,11 @@ export class RangeManager {
 
   public clearRange() {
     this.setRange(-1, -1)
+  }
+
+  public getIsCollapsed(): boolean {
+    const { startIndex, endIndex } = this.range
+    return startIndex === endIndex
   }
 
   public getSelection(): IElement[] | null {
@@ -81,11 +87,7 @@ export class RangeManager {
     const rangeRow: RangeRowArray = new Map()
     // 向上查找
     let start = startIndex
-    while (start > 0) {
-      if (
-        positionList[start].value === ZERO ||
-        (elementList[start].titleId !== elementList[start - 1]?.titleId)
-      ) break
+    while (start >= 0) {
       const { pageNo, rowNo } = positionList[start]
       let rowArray = rangeRow.get(pageNo)
       if (!rowArray) {
@@ -95,7 +97,27 @@ export class RangeManager {
       if (!rowArray.includes(rowNo)) {
         rowArray.unshift(rowNo)
       }
+      if (
+        positionList[start]?.value === ZERO ||
+        elementList[start].titleId !== elementList[start - 1]?.titleId
+      ) break
       start--
+    }
+    // 中间选择
+    if (startIndex !== endIndex) {
+      let middle = startIndex + 1
+      while (middle < endIndex) {
+        const { pageNo, rowNo } = positionList[middle]
+        let rowArray = rangeRow.get(pageNo)
+        if (!rowArray) {
+          rowArray = []
+          rangeRow.set(pageNo, rowArray)
+        }
+        if (!rowArray.includes(rowNo)) {
+          rowArray.push(rowNo)
+        }
+        middle++
+      }
     }
     // 向下查找
     let end = endIndex
@@ -116,6 +138,34 @@ export class RangeManager {
       end++
     }
     return rangeRow
+  }
+
+  // 获取选区元素列表
+  public getRangeElementList(): IElement[] | null {
+    const { startIndex, endIndex } = this.range
+    if (!~startIndex && !~endIndex) return null
+    // 需要改变的元素列表
+    const rangeElementList: IElement[] = []
+    // 选区行信息
+    const rangeRow = this.getRangeParagraph()
+    if (!rangeRow) return null
+    const elementList = this.draw.getElementList()
+    const positionList = this.position.getPositionList()
+    for (let p = 0; p < positionList.length; p++) {
+      const position = positionList[p]
+      const rowArray = rangeRow.get(position.pageNo)
+      if (!rowArray) continue
+      if (rowArray.includes(position.rowNo)) {
+        rangeElementList.push(elementList[p])
+      }
+    }
+    return rangeElementList
+  }
+
+  public getIsSelectAll() {
+    const elementList = this.draw.getElementList()
+    const { startIndex, endIndex } = this.range
+    return startIndex === 0 && elementList.length - 1 === endIndex
   }
 
   public getIsPointInRange(x: number, y: number): boolean {
@@ -176,8 +226,9 @@ export class RangeManager {
   public setRangeStyle() {
     if (!this.listener.rangeStyleChange) return
     // 结束光标位置
-    const { endIndex, isCrossRowCol } = this.range
-    let curElement: IElement
+    const { startIndex, endIndex, isCrossRowCol } = this.range
+    if (!~startIndex && !~endIndex) return
+    let curElement: IElement | null
     if (isCrossRowCol) {
       // 单元格选择以当前表格定位
       const originalElementList = this.draw.getOriginalElementList()
@@ -187,11 +238,7 @@ export class RangeManager {
       const index = ~endIndex ? endIndex : 0
       // 行首以第一个非换行符元素定位
       const elementList = this.draw.getElementList()
-      const endElement = elementList[index]
-      const endNextElement = elementList[index + 1]
-      curElement = endElement.value === ZERO && endNextElement
-        ? endNextElement
-        : endElement
+      curElement = getAnchorElement(elementList, index)
     }
     if (!curElement) return
     // 选取元素列表
@@ -211,6 +258,8 @@ export class RangeManager {
     const rowMargin = curElement.rowMargin || this.options.defaultRowMargin
     const dashArray = curElement.dashArray || []
     const level = curElement.level || null
+    const listType = curElement.listType || null
+    const listStyle = curElement.listStyle || null
     // 菜单
     const painter = !!this.draw.getPainterStyle()
     const undo = this.historyManager.isCanUndo()
@@ -231,7 +280,9 @@ export class RangeManager {
       rowFlex,
       rowMargin,
       dashArray,
-      level
+      level,
+      listType,
+      listStyle
     })
   }
 
@@ -259,7 +310,9 @@ export class RangeManager {
       rowFlex: null,
       rowMargin,
       dashArray: [],
-      level: null
+      level: null,
+      listType: null,
+      listStyle: null
     })
   }
 

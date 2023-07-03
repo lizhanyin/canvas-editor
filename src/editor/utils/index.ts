@@ -1,11 +1,10 @@
 export function debounce(func: Function, delay: number) {
   let timer: number
-  return function (...args: any) {
+  return function (this: any, ...args: any[]) {
     if (timer) {
       window.clearTimeout(timer)
     }
     timer = window.setTimeout(() => {
-      // @ts-ignore
       func.apply(this, args)
     }, delay)
   }
@@ -137,4 +136,24 @@ export function convertNumberToChinese(num: number) {
   result = result.replace(/零+$/, '')
   result = result.replace(/^一十/g, '十')
   return result
+}
+
+export function cloneProperty<T>(properties: (keyof T)[], sourceElement: T, targetElement: T) {
+  for (let i = 0; i < properties.length; i++) {
+    const property = properties[i]
+    const value = sourceElement[property]
+    if (value !== undefined) {
+      targetElement[property] = value
+    } else {
+      delete targetElement[property]
+    }
+  }
+}
+
+export function convertStringToBase64(input: string) {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(input)
+  const charArray = Array.from(data, byte => String.fromCharCode(byte))
+  const base64 = window.btoa(charArray.join(''))
+  return base64
 }

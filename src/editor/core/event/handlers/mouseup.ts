@@ -3,7 +3,7 @@ import { ControlComponent, ControlType } from '../../../dataset/enum/Control'
 import { ElementType } from '../../../dataset/enum/Element'
 import { IElement } from '../../../interface/Element'
 import { deepClone, getUUID } from '../../../utils'
-import { formatElementList } from '../../../utils/element'
+import { formatElementContext, formatElementList } from '../../../utils/element'
 import { CanvasEvent } from '../CanvasEvent'
 
 type IDragElement = IElement & { dragId: string }
@@ -82,17 +82,10 @@ export function mouseup(evt: MouseEvent, host: CanvasEvent) {
     // 格式化元素
     const editorOptions = draw.getOptions()
     const elementList = draw.getElementList()
-    const anchorElement = elementList[range.startIndex]
-    let restArg = {}
-    if (anchorElement.tableId) {
-      const { tdId, trId, tableId } = anchorElement
-      restArg = { tdId, trId, tableId }
-    }
     const replaceElementList = dragElementList.map(el => {
       if (!el.type || el.type === ElementType.TEXT || el.control?.type === ControlType.TEXT) {
         const newElement: IElement = {
-          value: el.value,
-          ...restArg
+          value: el.value
         }
         EDITOR_ELEMENT_STYLE_ATTR.forEach(attr => {
           const value = el[attr] as never
@@ -110,6 +103,7 @@ export function mouseup(evt: MouseEvent, host: CanvasEvent) {
         return newElement
       }
     })
+    formatElementContext(elementList, replaceElementList, range.startIndex)
     // 缓存拖拽选区开始结束id
     const cacheRangeStartId = createDragId(cacheElementList[cacheRange.startIndex])
     const cacheRangeEndId = createDragId(cacheElementList[cacheRange.endIndex])
@@ -123,7 +117,7 @@ export function mouseup(evt: MouseEvent, host: CanvasEvent) {
       rangeEnd = activeControl.setValue(replaceElementList)
       rangeStart = rangeEnd - replaceLength
     } else {
-      elementList.splice(rangeStart + 1, 0, ...replaceElementList)
+      draw.spliceElementList(elementList, rangeStart + 1, 0, ...replaceElementList)
     }
     if (!~rangeEnd) {
       draw.render({
@@ -146,7 +140,7 @@ export function mouseup(evt: MouseEvent, host: CanvasEvent) {
       })
       control.getActiveControl()?.cut()
     } else {
-      cacheElementList.splice(cacheRangeStartIndex + 1, cacheRangeEndIndex - cacheRangeStartIndex)
+      draw.spliceElementList(cacheElementList, cacheRangeStartIndex + 1, cacheRangeEndIndex - cacheRangeStartIndex)
     }
     // 重设上下文
     const startElement = elementList[range.startIndex]

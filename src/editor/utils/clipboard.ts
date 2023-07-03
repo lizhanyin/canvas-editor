@@ -1,6 +1,7 @@
-import { IEditorOption, IElement, RowFlex } from '..'
+import { IEditorOption, IElement, ListStyle, ListType, RowFlex } from '..'
 import { ZERO } from '../dataset/constant/Common'
 import { INLINE_NODE_NAME, TEXTLIKE_ELEMENT_TYPE } from '../dataset/constant/Element'
+import { listStyleCSSMapping, listTypeElementMapping } from '../dataset/constant/List'
 import { titleNodeNameMapping, titleOrderNumberMapping } from '../dataset/constant/Title'
 import { ControlComponent } from '../dataset/enum/Control'
 import { ElementType } from '../dataset/enum/Element'
@@ -37,8 +38,15 @@ export function writeClipboardItem(text: string, html: string) {
 }
 
 export function convertElementToDom(element: IElement, options: DeepRequired<IEditorOption>): HTMLElement {
-  const isBlock = element.rowFlex === RowFlex.CENTER || element.rowFlex === RowFlex.RIGHT
-  const dom = document.createElement(isBlock ? 'p' : 'span')
+  let tagName: keyof HTMLElementTagNameMap = 'span'
+  if (element.type === ElementType.SUPERSCRIPT) {
+    tagName = 'sup'
+  } else if (element.type === ElementType.SUBSCRIPT) {
+    tagName = 'sub'
+  } else if (element.rowFlex === RowFlex.CENTER || element.rowFlex === RowFlex.RIGHT) {
+    tagName = 'p'
+  }
+  const dom = document.createElement(tagName)
   dom.style.fontFamily = element.font || options.defaultFont
   if (element.rowFlex) {
     const isAlignment = element.rowFlex === RowFlex.ALIGNMENT
@@ -53,9 +61,7 @@ export function convertElementToDom(element: IElement, options: DeepRequired<IEd
   if (element.italic) {
     dom.style.fontStyle = 'italic'
   }
-  if (element.size) {
-    dom.style.fontSize = `${element.size}px`
-  }
+  dom.style.fontSize = `${element.size || options.defaultSize}px`
   if (element.highlight) {
     dom.style.backgroundColor = element.highlight
   }
@@ -83,6 +89,9 @@ export function writeElementList(elementList: IElement[], options: DeepRequired<
             tdDom.rowSpan = td.rowspan
             const childDom = buildDomFromElementList(zipElementList(td.value!))
             tdDom.innerHTML = childDom.innerHTML
+            if (td.backgroundColor) {
+              tdDom.style.backgroundColor = td.backgroundColor
+            }
             trDom.append(tdDom)
           }
           tableDom.append(trDom)
@@ -100,6 +109,44 @@ export function writeElementList(elementList: IElement[], options: DeepRequired<
         const childDom = buildDomFromElementList(zipElementList(element.valueList!))
         h.innerHTML = childDom.innerHTML
         clipboardDom.append(h)
+      } else if (element.type === ElementType.LIST) {
+        const list = document.createElement(listTypeElementMapping[element.listType!])
+        if (element.listStyle) {
+          list.style.listStyleType = listStyleCSSMapping[element.listStyle]
+        }
+        // 按照换行符拆分
+        let curListIndex = 0
+        const listElementListMap: Map<number, IElement[]> = new Map()
+        const zipList = zipElementList(element.valueList!)
+        for (let z = 0; z < zipList.length; z++) {
+          const zipElement = zipList[z]
+          if (zipElement.listWrap) {
+            const listElementList = listElementListMap.get(curListIndex) || []
+            listElementList.push(zipElement)
+            listElementListMap.set(curListIndex, listElementList)
+          } else {
+            const zipValueList = zipElement.value.split('\n')
+            for (let c = 0; c < zipValueList.length; c++) {
+              if (c > 0) {
+                curListIndex += 1
+              }
+              const value = zipValueList[c]
+              const listElementList = listElementListMap.get(curListIndex) || []
+              listElementList.push({
+                ...zipElement,
+                value,
+              })
+              listElementListMap.set(curListIndex, listElementList)
+            }
+          }
+        }
+        listElementListMap.forEach(listElementList => {
+          const li = document.createElement('li')
+          const childDom = buildDomFromElementList(listElementList)
+          li.innerHTML = childDom.innerHTML
+          list.append(li)
+        })
+        clipboardDom.append(list)
       } else if (element.type === ElementType.IMAGE) {
         const img = document.createElement('img')
         if (element.value) {
@@ -154,6 +201,40 @@ export function writeElementList(elementList: IElement[], options: DeepRequired<
   writeClipboardItem(text, html)
 }
 
+export function convertTextNodeToElement(textNode: Element | Node): IElement | null {
+  if (!textNode || textNode.nodeType !== 3) return null
+  const parentNode = <HTMLElement>textNode.parentNode
+  const anchorNode = parentNode.nodeName === 'FONT'
+    ? <HTMLElement>parentNode.parentNode
+    : parentNode
+  const rowFlex = getElementRowFlex(anchorNode)
+  const value = textNode.textContent
+  const style = window.getComputedStyle(anchorNode)
+  if (!value || anchorNode.nodeName === 'STYLE') return null
+  const element: IElement = {
+    value,
+    color: style.color,
+    bold: Number(style.fontWeight) > 500,
+    italic: style.fontStyle.includes('italic'),
+    size: Math.floor(parseFloat(style.fontSize))
+  }
+  // 元素类型-默认文本
+  if (anchorNode.nodeName === 'SUB' || style.verticalAlign === 'sub') {
+    element.type = ElementType.SUBSCRIPT
+  } else if (anchorNode.nodeName === 'SUP' || style.verticalAlign === 'super') {
+    element.type = ElementType.SUPERSCRIPT
+  }
+  // 行对齐
+  if (rowFlex !== RowFlex.LEFT) {
+    element.rowFlex = rowFlex
+  }
+  // 高亮色
+  if (style.backgroundColor !== 'rgba(0, 0, 0, 0)') {
+    element.highlight = style.backgroundColor
+  }
+  return element
+}
+
 interface IGetElementListByHTMLOption {
   innerWidth: number;
 }
@@ -162,24 +243,8 @@ export function getElementListByHTML(htmlText: string, options: IGetElementListB
   const elementList: IElement[] = []
   function findTextNode(dom: Element | Node) {
     if (dom.nodeType === 3) {
-      const parentNode = <HTMLElement>dom.parentNode
-      const rowFlex = getElementRowFlex(parentNode)
-      const value = dom.textContent
-      const style = window.getComputedStyle(parentNode)
-      if (value && parentNode.nodeName !== 'STYLE') {
-        const element: IElement = {
-          value,
-          color: style.color,
-          bold: Number(style.fontWeight) > 500,
-          italic: style.fontStyle.includes('italic'),
-          size: Math.floor(Number(style.fontSize.replace('px', '')))
-        }
-        if (rowFlex !== RowFlex.LEFT) {
-          element.rowFlex = rowFlex
-        }
-        if (style.backgroundColor !== 'rgba(0, 0, 0, 0)') {
-          element.highlight = style.backgroundColor
-        }
+      const element = convertTextNodeToElement(dom)
+      if (element) {
         elementList.push(element)
       }
     } else if (dom.nodeType === 1) {
@@ -218,6 +283,32 @@ export function getElementListByHTML(htmlText: string, options: IGetElementListB
               value: '\n'
             })
           }
+        } else if (node.nodeName === 'UL' || node.nodeName === 'OL') {
+          const listNode = node as HTMLOListElement | HTMLUListElement
+          const listElement: IElement = {
+            value: '',
+            type: ElementType.LIST,
+            valueList: []
+          }
+          if (node.nodeName === 'OL') {
+            listElement.listType = ListType.OL
+          } else {
+            listElement.listType = ListType.UL
+            listElement.listStyle = <ListStyle><unknown>listNode.style.listStyleType
+          }
+          listNode.querySelectorAll('li').forEach(li => {
+            const liValueList = getElementListByHTML(li.innerHTML, options)
+            liValueList.forEach(list => {
+              if (list.value === '\n') {
+                list.listWrap = true
+              }
+            })
+            liValueList.unshift({
+              value: '\n'
+            })
+            listElement.valueList!.push(...liValueList)
+          })
+          elementList.push(listElement)
         } else if (node.nodeName === 'HR') {
           elementList.push({
             value: '\n',
@@ -255,6 +346,9 @@ export function getElementListByHTML(htmlText: string, options: IGetElementListB
                 colspan: tableCell.colSpan,
                 rowspan: tableCell.rowSpan,
                 value: valueList
+              }
+              if (tableCell.style.backgroundColor) {
+                td.backgroundColor = tableCell.style.backgroundColor
               }
               tr.tdList.push(td)
             })
@@ -301,7 +395,7 @@ export function getElementListByHTML(htmlText: string, options: IGetElementListB
   document.body.appendChild(clipboardDom)
   const deleteNodes: ChildNode[] = []
   clipboardDom.childNodes.forEach(child => {
-    if (child.nodeType !== 1) {
+    if (child.nodeType !== 1 && !child.textContent?.trim()) {
       deleteNodes.push(child)
     }
   })

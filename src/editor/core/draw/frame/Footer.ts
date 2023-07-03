@@ -44,12 +44,12 @@ export class Footer {
   }
 
   public compute() {
-    this._recovery()
+    this.recovery()
     this._computeRowList()
     this._computePositionList()
   }
 
-  private _recovery() {
+  public recovery() {
     this.rowList = []
     this.positionList = []
   }
@@ -72,6 +72,7 @@ export class Footer {
       positionList: this.positionList,
       rowList: this.rowList,
       pageNo: 0,
+      startRowIndex: 0,
       startIndex: 0,
       startX,
       startY,
@@ -80,7 +81,8 @@ export class Footer {
   }
 
   public getFooterBottom(): number {
-    const { footer: { bottom }, scale } = this.options
+    const { footer: { bottom, disabled }, scale } = this.options
+    if (disabled) return 0
     return Math.floor(bottom * scale)
   }
 

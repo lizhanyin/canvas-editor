@@ -7,6 +7,7 @@ import { IFooter } from './Footer'
 import { IHeader } from './Header'
 import { IMargin } from './Margin'
 import { IPageNumber } from './PageNumber'
+import { IPlaceholder } from './Placeholder'
 import { ITitleOption } from './Title'
 import { IWatermark } from './Watermark'
 
@@ -50,6 +51,7 @@ export interface IEditorOption {
   defaultHyperlinkColor?: string;
   paperDirection?: PaperDirection;
   inactiveAlpha?: number;
+  historyMaxRecordCount?: number;
   header?: IHeader;
   footer?: IFooter;
   pageNumber?: IPageNumber;
@@ -58,6 +60,7 @@ export interface IEditorOption {
   checkbox?: ICheckboxOption;
   cursor?: ICursorOption;
   title?: ITitleOption;
+  placeholder?: IPlaceholder;
 }
 
 export interface IEditorResult {

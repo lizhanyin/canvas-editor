@@ -9,4 +9,7 @@ export interface IPageNumber {
   rowFlex?: RowFlex;
   format?: string;
   numberType?: NumberType;
+  disabled?: boolean;
+  startPageNo?: number;
+  fromPageNo?: number;
 }

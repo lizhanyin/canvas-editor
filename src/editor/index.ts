@@ -41,13 +41,20 @@ import { MaxHeightRatio, NumberType } from './dataset/enum/Common'
 import { ITitleOption } from './interface/Title'
 import { defaultTitleOption } from './dataset/constant/Title'
 import { TitleLevel } from './dataset/enum/Title'
+import { ListStyle, ListType } from './dataset/enum/List'
+import { ICatalog, ICatalogItem } from './interface/Catalog'
+import { IPlaceholder } from './interface/Placeholder'
+import { defaultPlaceholderOption } from './dataset/constant/Placeholder'
+import { Plugin } from './core/plugin/Plugin'
+import { UsePlugin } from './interface/Plugin'
 
 export default class Editor {
 
   public command: Command
   public listener: Listener
   public register: Register
-  public destroy: Function
+  public destroy: () => void
+  public use: UsePlugin
 
   constructor(container: HTMLDivElement, data: IEditorData | IElement[], options: IEditorOption = {}) {
     const headerOptions: Required<IHeader> = {
@@ -81,6 +88,10 @@ export default class Editor {
     const titleOptions: Required<ITitleOption> = {
       ...defaultTitleOption,
       ...options.title
+    }
+    const placeholderOptions: Required<IPlaceholder> = {
+      ...defaultPlaceholderOption,
+      ...options.placeholder
     }
 
     const editorOptions: DeepRequired<IEditorOption> = {
@@ -117,6 +128,7 @@ export default class Editor {
       defaultHyperlinkColor: '#0000FF',
       paperDirection: PaperDirection.VERTICAL,
       inactiveAlpha: 0.6,
+      historyMaxRecordCount: 100,
       ...options,
       header: headerOptions,
       footer: footerOptions,
@@ -125,7 +137,8 @@ export default class Editor {
       control: controlOptions,
       checkbox: checkboxOptions,
       cursor: cursorOptions,
-      title: titleOptions
+      title: titleOptions,
+      placeholder: placeholderOptions
     }
     // 数据处理
     let headerElementList: IElement[] = []
@@ -175,6 +188,9 @@ export default class Editor {
       shortcut.removeEvent()
       contextMenu.removeEvent()
     }
+    // 插件
+    const plugin = new Plugin(this)
+    this.use = plugin.use.bind(plugin)
   }
 
 }
@@ -199,7 +215,9 @@ export {
   TableBorder,
   MaxHeightRatio,
   NumberType,
-  TitleLevel
+  TitleLevel,
+  ListType,
+  ListStyle
 }
 
 // 对外类型
@@ -213,5 +231,7 @@ export type {
   IWatermark,
   INavigateInfo,
   IBlock,
-  ILang
+  ILang,
+  ICatalog,
+  ICatalogItem
 }
