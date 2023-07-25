@@ -21,7 +21,7 @@ const {
   header?: IHeader;
   watermark?: IWatermark;
   data: IEditorData;
-} = instance.command.getValue()
+} = instance.command.getValue(options?: IGetValueOption)
 ```
 
 ## getImage
@@ -29,7 +29,7 @@ const {
 
 用法：
 ```javascript
-const base64StringList = await instance.command.getImage()
+const base64StringList = await instance.command.getImage(pixelRatio?: number)
 ```
 
 ## getWordCount
@@ -46,6 +46,14 @@ const wordCount = await instance.command.getWordCount()
 用法：
 ```javascript
 const rangeText = instance.command.getRangeText()
+```
+
+## getRangeContext
+功能：获取选区上下文
+
+用法：
+```javascript
+const rangeContext = instance.command.getRangeContext()
 ```
 
 ## getPaperMargin

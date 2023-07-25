@@ -10,8 +10,18 @@ import { ElementType } from './dataset/enum/Element'
 import { formatElementList } from './utils/element'
 import { Register } from './core/register/Register'
 import { ContextMenu } from './core/contextmenu/ContextMenu'
-import { IContextMenuContext, IRegisterContextMenu } from './interface/contextmenu/ContextMenu'
-import { EditorComponent, EditorZone, EditorMode, PageMode, PaperDirection } from './dataset/enum/Editor'
+import {
+  IContextMenuContext,
+  IRegisterContextMenu
+} from './interface/contextmenu/ContextMenu'
+import {
+  EditorComponent,
+  EditorZone,
+  EditorMode,
+  PageMode,
+  PaperDirection,
+  WordBreak
+} from './dataset/enum/Editor'
 import { EDITOR_COMPONENT } from './dataset/constant/Editor'
 import { IHeader } from './interface/Header'
 import { IWatermark } from './interface/Watermark'
@@ -47,16 +57,22 @@ import { IPlaceholder } from './interface/Placeholder'
 import { defaultPlaceholderOption } from './dataset/constant/Placeholder'
 import { Plugin } from './core/plugin/Plugin'
 import { UsePlugin } from './interface/Plugin'
+import { EventBus } from './core/event/eventbus/EventBus'
+import { EventBusMap } from './interface/EventBus'
 
 export default class Editor {
-
   public command: Command
   public listener: Listener
+  public eventBus: EventBus<EventBusMap>
   public register: Register
   public destroy: () => void
   public use: UsePlugin
 
-  constructor(container: HTMLDivElement, data: IEditorData | IElement[], options: IEditorOption = {}) {
+  constructor(
+    container: HTMLDivElement,
+    data: IEditorData | IElement[],
+    options: IEditorOption = {}
+  ) {
     const headerOptions: Required<IHeader> = {
       ...defaultHeaderOption,
       ...options.header
@@ -125,10 +141,13 @@ export default class Editor {
       pageMode: PageMode.PAGING,
       tdPadding: 5,
       defaultTrMinHeight: 40,
+      defaultColMinWidth: 40,
       defaultHyperlinkColor: '#0000FF',
       paperDirection: PaperDirection.VERTICAL,
       inactiveAlpha: 0.6,
       historyMaxRecordCount: 100,
+      wordBreak: WordBreak.BREAK_WORD,
+      printPixelRatio: 3,
       ...options,
       header: headerOptions,
       footer: footerOptions,
@@ -151,14 +170,20 @@ export default class Editor {
       mainElementList = data.main
       footerElementList = data.footer || []
     }
-    [headerElementList, mainElementList, footerElementList]
-      .forEach(elementList => {
-        formatElementList(elementList, {
-          editorOptions
-        })
+    const pageComponentData = [
+      headerElementList,
+      mainElementList,
+      footerElementList
+    ]
+    pageComponentData.forEach(elementList => {
+      formatElementList(elementList, {
+        editorOptions
       })
+    })
     // 监听
     this.listener = new Listener()
+    // 事件
+    this.eventBus = new EventBus<EventBusMap>()
     // 启动
     const draw = new Draw(
       container,
@@ -168,7 +193,8 @@ export default class Editor {
         main: mainElementList,
         footer: footerElementList
       },
-      this.listener
+      this.listener,
+      this.eventBus
     )
     // 命令
     this.command = new Command(new CommandAdapt(draw))
@@ -192,7 +218,6 @@ export default class Editor {
     const plugin = new Plugin(this)
     this.use = plugin.use.bind(plugin)
   }
-
 }
 
 // 对外对象
@@ -217,7 +242,8 @@ export {
   NumberType,
   TitleLevel,
   ListType,
-  ListStyle
+  ListStyle,
+  WordBreak
 }
 
 // 对外类型
