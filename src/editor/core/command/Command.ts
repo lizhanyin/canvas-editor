@@ -74,9 +74,11 @@ export class Command {
   public executeSetLocale: CommandAdapt['setLocale']
   public executeLocationCatalog: CommandAdapt['locationCatalog']
   public executeWordTool: CommandAdapt['wordTool']
+  public executeSetHTML: CommandAdapt['setHTML']
   public getCatalog: CommandAdapt['getCatalog']
   public getImage: CommandAdapt['getImage']
   public getValue: CommandAdapt['getValue']
+  public getHTML: CommandAdapt['getHTML']
   public getWordCount: CommandAdapt['getWordCount']
   public getRangeText: CommandAdapt['getRangeText']
   public getRangeContext: CommandAdapt['getRangeContext']
@@ -164,9 +166,12 @@ export class Command {
     this.executeSetLocale = adapt.setLocale.bind(adapt)
     this.executeLocationCatalog = adapt.locationCatalog.bind(adapt)
     this.executeWordTool = adapt.wordTool.bind(adapt)
+    this.executeSetHTML = adapt.setHTML.bind(adapt)
+
     // 获取
     this.getImage = adapt.getImage.bind(adapt)
     this.getValue = adapt.getValue.bind(adapt)
+    this.getHTML = adapt.getHTML.bind(adapt)
     this.getWordCount = adapt.getWordCount.bind(adapt)
     this.getRangeText = adapt.getRangeText.bind(adapt)
     this.getRangeContext = adapt.getRangeContext.bind(adapt)

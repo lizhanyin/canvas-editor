@@ -17,6 +17,7 @@ import { TableBorder } from '../../dataset/enum/table/Table'
 import { TitleLevel } from '../../dataset/enum/Title'
 import { VerticalAlign } from '../../dataset/enum/VerticalAlign'
 import { ICatalog } from '../../interface/Catalog'
+import { DeepRequired } from '../../interface/Common'
 import {
   IAppendElementListOption,
   IDrawImagePayload,
@@ -25,6 +26,7 @@ import {
 } from '../../interface/Draw'
 import {
   IEditorData,
+  IEditorHTML,
   IEditorOption,
   IEditorResult
 } from '../../interface/Editor'
@@ -37,10 +39,12 @@ import { ITr } from '../../interface/table/Tr'
 import { IWatermark } from '../../interface/Watermark'
 import { deepClone, downloadFile, getUUID } from '../../utils'
 import {
+  createDomFromElementList,
   formatElementContext,
   formatElementList,
   isTextLikeElement,
-  pickElementAttr
+  pickElementAttr,
+  getElementListByHTML
 } from '../../utils/element'
 import { printImageBase64 } from '../../utils/print'
 import { Control } from '../draw/control/Control'
@@ -61,7 +65,7 @@ export class CommandAdapt {
   private historyManager: HistoryManager
   private canvasEvent: CanvasEvent
   private tableTool: TableTool
-  private options: Required<IEditorOption>
+  private options: DeepRequired<IEditorOption>
   private control: Control
   private workerManager: WorkerManager
   private searchManager: Search
@@ -1680,6 +1684,18 @@ export class CommandAdapt {
     return this.draw.getValue(options)
   }
 
+  public getHTML(): IEditorHTML {
+    const options = this.options
+    const headerElementList = this.draw.getHeaderElementList()
+    const mainElementList = this.draw.getOriginalMainElementList()
+    const footerElementList = this.draw.getFooterElementList()
+    return {
+      header: createDomFromElementList(headerElementList, options).innerHTML,
+      main: createDomFromElementList(mainElementList, options).innerHTML,
+      footer: createDomFromElementList(footerElementList, options).innerHTML
+    }
+  }
+
   public getWordCount(): Promise<number> {
     return this.workerManager.getWordCount()
   }
@@ -1853,5 +1869,22 @@ export class CommandAdapt {
         isSetCursor: false
       })
     }
+  }
+
+  public setHTML(payload: Partial<IEditorHTML>) {
+    const { header, main, footer } = payload
+    const innerWidth = this.draw.getOriginalInnerWidth()
+    // 不设置值时数据为undefined，避免覆盖当前数据
+    const getElementList = (htmlText?: string) =>
+      htmlText !== undefined
+        ? getElementListByHTML(htmlText, {
+            innerWidth
+          })
+        : undefined
+    this.setValue({
+      header: getElementList(header),
+      main: getElementList(main),
+      footer: getElementList(footer)
+    })
   }
 }
