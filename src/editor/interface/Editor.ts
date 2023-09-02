@@ -9,8 +9,10 @@ import { ICheckboxOption } from './Checkbox'
 import { IControlOption } from './Control'
 import { ICursorOption } from './Cursor'
 import { IFooter } from './Footer'
+import { IGroup } from './Group'
 import { IHeader } from './Header'
 import { IMargin } from './Margin'
+import { IPageBreak } from './PageBreak'
 import { IPageNumber } from './PageNumber'
 import { IPlaceholder } from './Placeholder'
 import { ITitleOption } from './Title'
@@ -70,6 +72,8 @@ export interface IEditorOption {
   cursor?: ICursorOption
   title?: ITitleOption
   placeholder?: IPlaceholder
+  group?: IGroup
+  pageBreak?: IPageBreak
 }
 
 export interface IEditorResult {

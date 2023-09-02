@@ -9,6 +9,11 @@ export interface IDrawOption {
   isCompute?: boolean
   isLazy?: boolean
   isInit?: boolean
+  isSourceHistory?: boolean
+}
+
+export interface IForceUpdateOption {
+  isSubmitHistory?: boolean
 }
 
 export interface IDrawImagePayload {

@@ -79,6 +79,16 @@ Usage:
 instance.command.executeSetRange(startIndex: number , endIndex: number)
 ```
 
+## executeForceUpdate
+
+Feature: force update editor
+
+Usage:
+
+```javascript
+instance.command.executeForceUpdate(options?: IForceUpdateOption)
+```
+
 ## executeUndo
 
 Feature: Undo
@@ -407,6 +417,16 @@ Usage:
 
 ```javascript
 instance.command.executeTableBorderType(payload: TableBorder)
+```
+
+## executeTableTdBorderType
+
+Feature: Table td border type
+
+Usage:
+
+```javascript
+instance.command.executeTableTdBorderType(payload: TableBorder)
 ```
 
 ## executeTableTdBackgroundColor
@@ -755,9 +775,41 @@ instance.command.executeWordTool()
 ```
 
 ## executeSetHTML
+
 Feature: Set the editor HTML data
 
 Usage:
+
 ```javascript
 instance.command.executeSetHTML(payload: Partial<IEditorHTML)
+```
+
+## executeSetGroup
+
+Feature: Set group
+
+Usage:
+
+```javascript
+instance.command.executeSetGroup()
+```
+
+## executeDeleteGroup
+
+Feature: Delete group
+
+Usage:
+
+```javascript
+instance.command.executeDeleteGroup(groupId: string)
+```
+
+## executeLocationGroup
+
+Feature: Positioning group position
+
+Usage:
+
+```javascript
+instance.command.executeLocationGroup(groupId: string)
 ```

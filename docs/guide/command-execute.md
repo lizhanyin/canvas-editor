@@ -79,6 +79,16 @@ instance.command.executeBackspace()
 instance.command.executeSetRange(startIndex: number , endIndex: number)
 ```
 
+## executeForceUpdate
+
+功能：强制重新渲染文档
+
+用法：
+
+```javascript
+instance.command.executeForceUpdate(options?: IForceUpdateOption)
+```
+
 ## executeUndo
 
 功能：撤销
@@ -407,6 +417,16 @@ instance.command.executeTableTdVerticalAlign(payload: VerticalAlign)
 
 ```javascript
 instance.command.executeTableBorderType(payload: TableBorder)
+```
+
+## executeTableTdBorderType
+
+功能：表格单元格边框类型
+
+用法：
+
+```javascript
+instance.command.executeTableTdBorderType(payload: TdBorder)
 ```
 
 ## executeTableTdBackgroundColor
@@ -762,4 +782,34 @@ instance.command.executeWordTool()
 
 ```javascript
 instance.command.executeSetHTML(payload: Partial<IEditorHTML)
+```
+
+## executeSetGroup
+
+功能：设置成组
+
+用法：
+
+```javascript
+instance.command.executeSetGroup()
+```
+
+## executeDeleteGroup
+
+功能：删除成组
+
+用法：
+
+```javascript
+instance.command.executeDeleteGroup(groupId: string)
+```
+
+## executeLocationGroup
+
+功能：定位成组位置
+
+用法：
+
+```javascript
+instance.command.executeLocationGroup(groupId: string)
 ```

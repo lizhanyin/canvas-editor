@@ -1,4 +1,4 @@
-import { cloneProperty, deepClone, getUUID, splitText } from '.'
+import { cloneProperty, deepClone, getUUID, isArrayEqual, splitText } from '.'
 import {
   ElementType,
   IEditorOption,
@@ -8,14 +8,13 @@ import {
   RowFlex
 } from '..'
 import { LaTexParticle } from '../core/draw/particle/latex/LaTexParticle'
-import { defaultCheckboxOption } from '../dataset/constant/Checkbox'
 import { NON_BREAKING_SPACE, ZERO } from '../dataset/constant/Common'
-import { defaultControlOption } from '../dataset/constant/Control'
 import {
   EDITOR_ELEMENT_CONTEXT_ATTR,
   EDITOR_ELEMENT_ZIP_ATTR,
   INLINE_NODE_NAME,
   TABLE_CONTEXT_ATTR,
+  TABLE_TD_ZIP_ATTR,
   TEXTLIKE_ELEMENT_TYPE
 } from '../dataset/constant/Element'
 import {
@@ -46,7 +45,7 @@ export function unzipElementList(elementList: IElement[]): IElement[] {
 
 interface IFormatElementListOption {
   isHandleFirstElement?: boolean
-  editorOptions: Required<IEditorOption>
+  editorOptions: DeepRequired<IEditorOption>
 }
 
 export function formatElementList(
@@ -198,6 +197,9 @@ export function formatElementList(
     } else if (el.type === ElementType.CONTROL) {
       const { prefix, postfix, value, placeholder, code, type, valueSets } =
         el.control!
+      const {
+        editorOptions: { control: controlOption, checkbox: checkboxOption }
+      } = options
       const controlId = getUUID()
       // 移除父节点
       elementList.splice(i, 1)
@@ -207,7 +209,7 @@ export function formatElementList(
         thePrePostfixArgs.color = editorOptions.control.bracketColor
       }
       // 前缀
-      const prefixStrList = splitText(prefix || defaultControlOption.prefix)
+      const prefixStrList = splitText(prefix || controlOption.prefix)
       for (let p = 0; p < prefixStrList.length; p++) {
         const value = prefixStrList[p]
         elementList.splice(i, 0, {
@@ -264,7 +266,7 @@ export function formatElementList(
                   controlId,
                   value,
                   type: el.type,
-                  letterSpacing: isLastLetter ? defaultCheckboxOption.gap : 0,
+                  letterSpacing: isLastLetter ? checkboxOption.gap : 0,
                   control: el.control,
                   controlComponent: ControlComponent.VALUE
                 })
@@ -324,7 +326,7 @@ export function formatElementList(
         }
       }
       // 后缀
-      const postfixStrList = splitText(postfix || defaultControlOption.postfix)
+      const postfixStrList = splitText(postfix || controlOption.postfix)
       for (let p = 0; p < postfixStrList.length; p++) {
         const value = postfixStrList[p]
         elementList.splice(i, 0, {
@@ -375,7 +377,17 @@ export function isSameElementExceptValue(
   if (sourceKeys.length !== targetKeys.length) return false
   for (let s = 0; s < sourceKeys.length; s++) {
     const key = sourceKeys[s] as never
+    // 值不需要校验
     if (key === 'value') continue
+    // groupIds数组需特殊校验数组是否相等
+    if (
+      key === 'groupIds' &&
+      Array.isArray(source[key]) &&
+      Array.isArray(target[key]) &&
+      isArrayEqual(source[key], target[key])
+    ) {
+      continue
+    }
     if (source[key] !== target[key]) {
       return false
     }
@@ -472,12 +484,13 @@ export function zipElementList(payload: IElement[]): IElement[] {
               rowspan: td.rowspan,
               value: zipElementList(td.value)
             }
-            if (td.verticalAlign) {
-              zipTd.verticalAlign = td.verticalAlign
-            }
-            if (td.backgroundColor) {
-              zipTd.backgroundColor = td.backgroundColor
-            }
+            // 压缩单元格属性
+            TABLE_TD_ZIP_ATTR.forEach(attr => {
+              const value = td[attr] as never
+              if (value !== undefined) {
+                zipTd[attr] = value
+              }
+            })
             tr.tdList[d] = zipTd
           }
         }

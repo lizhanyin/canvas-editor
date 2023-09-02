@@ -13,7 +13,7 @@ import { ElementType } from '../../dataset/enum/Element'
 import { ElementStyleKey } from '../../dataset/enum/ElementStyle'
 import { ListStyle, ListType } from '../../dataset/enum/List'
 import { RowFlex } from '../../dataset/enum/Row'
-import { TableBorder } from '../../dataset/enum/table/Table'
+import { TableBorder, TdBorder } from '../../dataset/enum/table/Table'
 import { TitleLevel } from '../../dataset/enum/Title'
 import { VerticalAlign } from '../../dataset/enum/VerticalAlign'
 import { ICatalog } from '../../interface/Catalog'
@@ -21,6 +21,7 @@ import { DeepRequired } from '../../interface/Common'
 import {
   IAppendElementListOption,
   IDrawImagePayload,
+  IForceUpdateOption,
   IGetImageOption,
   IGetValueOption,
   IPainterOption
@@ -153,6 +154,15 @@ export class CommandAdapt {
       isCompute: false,
       isSubmitHistory: false,
       isSetCursor: isCollapsed
+    })
+  }
+
+  public forceUpdate(options?: IForceUpdateOption) {
+    const { isSubmitHistory = false } = options || {}
+    this.range.clearRange()
+    this.draw.render({
+      isSubmitHistory,
+      isSetCursor: false
     })
   }
 
@@ -321,7 +331,10 @@ export class CommandAdapt {
     selection.forEach(el => {
       el.underline = !!~noUnderlineIndex
     })
-    this.draw.render({ isSetCursor: false })
+    this.draw.render({
+      isSetCursor: false,
+      isCompute: false
+    })
   }
 
   public strikeout() {
@@ -333,7 +346,10 @@ export class CommandAdapt {
     selection.forEach(el => {
       el.strikeout = !!~noStrikeoutIndex
     })
-    this.draw.render({ isSetCursor: false })
+    this.draw.render({
+      isSetCursor: false,
+      isCompute: false
+    })
   }
 
   public superscript() {
@@ -1211,6 +1227,27 @@ export class CommandAdapt {
     })
   }
 
+  public tableTdBorderType(payload: TdBorder) {
+    const isReadonly = this.draw.isReadonly()
+    if (isReadonly) return
+    const rowCol = this.draw.getTableParticle().getRangeRowCol()
+    if (!rowCol) return
+    const tdList = rowCol.flat()
+    // 存在则设置边框类型，否则取消设置
+    const isSetBorderType = tdList.some(td => td.borderType !== payload)
+    tdList.forEach(td => {
+      if (isSetBorderType) {
+        td.borderType = payload
+      } else {
+        delete td.borderType
+      }
+    })
+    const { endIndex } = this.range.getRange()
+    this.draw.render({
+      curIndex: endIndex
+    })
+  }
+
   public tableTdBackgroundColor(payload: string) {
     const isReadonly = this.draw.isReadonly()
     if (isReadonly) return
@@ -1690,6 +1727,10 @@ export class CommandAdapt {
     return this.draw.getDataURL(payload)
   }
 
+  public getOptions(): DeepRequired<IEditorOption> {
+    return this.options
+  }
+
   public getValue(options?: IGetValueOption): IEditorResult {
     return this.draw.getValue(options)
   }
@@ -1920,6 +1961,47 @@ export class CommandAdapt {
       header: getElementList(header),
       main: getElementList(main),
       footer: getElementList(footer)
+    })
+  }
+
+  public setGroup(): string | null {
+    const isReadonly = this.draw.isReadonly()
+    if (isReadonly) return null
+    return this.draw.getGroup().setGroup()
+  }
+
+  public deleteGroup(groupId: string) {
+    const isReadonly = this.draw.isReadonly()
+    if (isReadonly) return
+    this.draw.getGroup().deleteGroup(groupId)
+  }
+
+  public getGroupIds(): Promise<string[]> {
+    return this.draw.getWorkerManager().getGroupIds()
+  }
+
+  public locationGroup(groupId: string) {
+    const elementList = this.draw.getOriginalMainElementList()
+    const context = this.draw
+      .getGroup()
+      .getContextByGroupId(elementList, groupId)
+    if (!context) return
+    const { isTable, index, trIndex, tdIndex, tdId, trId, tableId, endIndex } =
+      context
+    this.position.setPositionContext({
+      isTable,
+      index,
+      trIndex,
+      tdIndex,
+      tdId,
+      trId,
+      tableId
+    })
+    this.range.setRange(endIndex, endIndex)
+    this.draw.render({
+      curIndex: endIndex,
+      isCompute: false,
+      isSubmitHistory: false
     })
   }
 }

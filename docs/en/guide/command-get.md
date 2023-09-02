@@ -37,6 +37,16 @@ Usage:
 const base64StringList = await instance.command.getImage(option?: IGetImageOption)
 ```
 
+## getOptions
+
+Feature: Get editor options
+
+Usage:
+
+```javascript
+const editorOption = await instance.command.getOptions()
+```
+
 ## getWordCount
 
 Feature: Get document word count
@@ -151,10 +161,20 @@ const {
 
 ## getLocale
 
-功能：Get current locale
+Feature: Get current locale
 
-用法：
+Usage:
 
 ```javascript
 const locale = await instance.command.getLocale()
+```
+
+## getGroupIds
+
+Feature: Get all group ids
+
+Usage:
+
+```javascript
+const groupIds = await instance.command.getGroupIds()
 ```
