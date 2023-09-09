@@ -65,6 +65,7 @@ import { IRangeStyle } from './interface/Listener'
 import { Override } from './core/override/Override'
 import { defaultPageBreakOption } from './dataset/constant/PageBreak'
 import { IPageBreak } from './interface/PageBreak'
+import { LETTER_CLASS } from './dataset/constant/Common'
 
 export default class Editor {
   public command: Command
@@ -154,8 +155,8 @@ export default class Editor {
       marginIndicatorColor: '#BABABA',
       margins: [100, 120, 100, 120],
       pageMode: PageMode.PAGING,
-      tdPadding: 5,
-      defaultTrMinHeight: 40,
+      tdPadding: [0, 5, 5, 5],
+      defaultTrMinHeight: 42,
       defaultColMinWidth: 40,
       defaultHyperlinkColor: '#0000FF',
       paperDirection: PaperDirection.VERTICAL,
@@ -164,6 +165,7 @@ export default class Editor {
       wordBreak: WordBreak.BREAK_WORD,
       printPixelRatio: 3,
       maskMargin: [0, 0, 0, 0],
+      letterClass: [LETTER_CLASS.ENGLISH],
       ...options,
       header: headerOptions,
       footer: footerOptions,
@@ -243,6 +245,8 @@ export default class Editor {
 
 // 对外对象
 export {
+  EDITOR_COMPONENT,
+  LETTER_CLASS,
   Editor,
   RowFlex,
   VerticalAlign,
@@ -251,7 +255,6 @@ export {
   ElementType,
   ControlType,
   EditorComponent,
-  EDITOR_COMPONENT,
   PageMode,
   ImageDisplay,
   Command,
