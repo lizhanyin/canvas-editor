@@ -1335,7 +1335,7 @@ export class Draw {
             // 超出行宽时截断
             const rowRemainingWidth =
               availableWidth - curRow.width - metrics.width
-            const left = Math.min(rowRemainingWidth, extraWidth)
+            const left = Math.min(rowRemainingWidth, extraWidth) * scale
             rowElement.left = left
             curRow.width += left
           } else {
@@ -1593,6 +1593,10 @@ export class Draw {
           this.blockParticle.render(pageNo, element, x, y)
         } else {
           this.textParticle.record(ctx, element, x, y + offsetY)
+          // 如果设置字宽需单独绘制
+          if (element.width) {
+            this._drawRichText(ctx)
+          }
         }
         // 下划线记录
         if (element.underline || element.control?.underline) {
