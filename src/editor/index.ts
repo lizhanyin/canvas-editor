@@ -44,7 +44,7 @@ import { defaultCursorOption } from './dataset/constant/Cursor'
 import { IPageNumber } from './interface/PageNumber'
 import { defaultPageNumberOption } from './dataset/constant/PageNumber'
 import { VerticalAlign } from './dataset/enum/VerticalAlign'
-import { TableBorder, TdBorder } from './dataset/enum/table/Table'
+import { TableBorder, TdBorder, TdSlash } from './dataset/enum/table/Table'
 import { IFooter } from './interface/Footer'
 import { defaultFooterOption } from './dataset/constant/Footer'
 import { MaxHeightRatio, NumberType } from './dataset/enum/Common'
@@ -140,6 +140,7 @@ export default class Editor {
       height: 1123,
       scale: 1,
       pageGap: 20,
+      backgroundColor: '#FFFFFF',
       underlineColor: '#000000',
       strikeoutColor: '#FF0000',
       rangeAlpha: 0.6,
@@ -263,6 +264,7 @@ export {
   PaperDirection,
   TableBorder,
   TdBorder,
+  TdSlash,
   MaxHeightRatio,
   NumberType,
   TitleLevel,
