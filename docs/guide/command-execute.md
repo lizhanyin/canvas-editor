@@ -46,7 +46,7 @@ instance.command.executeCopy()
 用法：
 
 ```javascript
-instance.command.executePaste()
+instance.command.executePaste(payload?: IPasteOption)
 ```
 
 ## executeSelectAll
@@ -87,6 +87,16 @@ instance.command.executeSetRange(startIndex: number , endIndex: number)
 
 ```javascript
 instance.command.executeForceUpdate(options?: IForceUpdateOption)
+```
+
+## executeBlur
+
+功能：设置编辑器失焦
+
+用法：
+
+```javascript
+instance.command.executeBlur()
 ```
 
 ## executeUndo
@@ -831,5 +841,15 @@ instance.command.executeLocationGroup(groupId: string)
 用法：
 
 ```javascript
-instance.command.executeSetControlValue(payload: ISetControlOption)
+instance.command.executeSetControlValue(payload: ISetControlValueOption)
+```
+
+## executeSetControlExtension
+
+功能：设置控件扩展值
+
+用法：
+
+```javascript
+instance.command.executeSetControlExtension(payload: ISetControlExtensionOption)
 ```
