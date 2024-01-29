@@ -22,6 +22,17 @@ export interface IControlCheckbox {
   checkbox?: ICheckbox
 }
 
+export interface IControlHighlightRule {
+  keyword: string
+  alpha?: number
+  backgroundColor?: string
+}
+
+export interface IControlHighlight {
+  ruleList: IControlHighlightRule[]
+  conceptId: string
+}
+
 export interface IControlRule {
   deletable?: boolean
   disabled?: boolean
@@ -107,4 +118,11 @@ export interface ISetControlValueOption {
 export interface ISetControlExtensionOption {
   conceptId: string
   extension: unknown
+}
+
+export type ISetControlHighlightOption = IControlHighlight[]
+
+export type ISetControlProperties = {
+  conceptId: string
+  properties: Partial<Omit<IControl, 'value'>>
 }

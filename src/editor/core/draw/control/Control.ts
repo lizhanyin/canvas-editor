@@ -1,9 +1,11 @@
 import { ControlComponent, ControlType } from '../../../dataset/enum/Control'
 import { EditorZone } from '../../../dataset/enum/Editor'
 import { ElementType } from '../../../dataset/enum/Element'
+import { DeepRequired } from '../../../interface/Common'
 import {
   IControl,
   IControlContext,
+  IControlHighlight,
   IControlInitOption,
   IControlInstance,
   IControlOption,
@@ -11,8 +13,10 @@ import {
   IGetControlValueOption,
   IGetControlValueResult,
   ISetControlExtensionOption,
+  ISetControlProperties,
   ISetControlValueOption
 } from '../../../interface/Control'
+import { IEditorData, IEditorOption } from '../../../interface/Editor'
 import { IElement, IElementPosition } from '../../../interface/Element'
 import { EventBusMap } from '../../../interface/EventBus'
 import { IRange } from '../../../interface/Range'
@@ -28,6 +32,7 @@ import { Listener } from '../../listener/Listener'
 import { RangeManager } from '../../range/RangeManager'
 import { Draw } from '../Draw'
 import { CheckboxControl } from './checkbox/CheckboxControl'
+import { ControlSearch } from './interactive/ControlSearch'
 import { SelectControl } from './select/SelectControl'
 import { TextControl } from './text/TextControl'
 
@@ -40,7 +45,9 @@ export class Control {
   private range: RangeManager
   private listener: Listener
   private eventBus: EventBus<EventBusMap>
-  private options: IControlOption
+  private controlSearch: ControlSearch
+  private options: DeepRequired<IEditorOption>
+  private controlOptions: IControlOption
   private activeControl: IControlInstance | null
 
   constructor(draw: Draw) {
@@ -48,9 +55,30 @@ export class Control {
     this.range = draw.getRange()
     this.listener = draw.getListener()
     this.eventBus = draw.getEventBus()
+    this.controlSearch = new ControlSearch(this)
 
-    this.options = draw.getOptions().control
+    this.options = draw.getOptions()
+    this.controlOptions = this.options.control
     this.activeControl = null
+  }
+
+  // 搜索高亮匹配
+  public setHighlightList(payload: IControlHighlight[]) {
+    this.controlSearch.setHighlightList(payload)
+  }
+
+  public computeHighlightList() {
+    const highlightList = this.controlSearch.getHighlightList()
+    if (highlightList.length) {
+      this.controlSearch.computeHighlightList()
+    }
+  }
+
+  public renderHighlightList(ctx: CanvasRenderingContext2D, pageNo: number) {
+    const highlightMatchResult = this.controlSearch.getHighlightMatchResult()
+    if (highlightMatchResult.length) {
+      this.controlSearch.renderHighlightList(ctx, pageNo)
+    }
   }
 
   public getDraw(): Draw {
@@ -70,8 +98,15 @@ export class Control {
           }
         }
       }
-      if (!element.controlId || element.control?.minWidth) {
-        return true
+      if (!element.controlId) return true
+      if (element.control?.minWidth) {
+        if (
+          element.controlComponent === ControlComponent.PREFIX ||
+          element.controlComponent === ControlComponent.POSTFIX
+        ) {
+          element.value = ''
+          return true
+        }
       }
       return (
         element.controlComponent !== ControlComponent.PREFIX &&
@@ -122,6 +157,26 @@ export class Control {
       return true
     }
     return false
+  }
+
+  // 判断是否在控件可输入的地方
+  public isRangeCanInput(): boolean {
+    const { startIndex, endIndex } = this.getRange()
+    if (!~startIndex && !~endIndex) return false
+    if (startIndex === endIndex) return true
+    const elementList = this.getElementList()
+    const startElement = elementList[startIndex]
+    const endElement = elementList[endIndex]
+    // 选区前后不是控件 || 选区前不在控件内&&选区后是后缀 || 选区前是控件&&选区后在控件内
+    return (
+      (!startElement.controlId && !endElement.controlId) ||
+      ((!startElement.controlId ||
+        startElement.controlComponent === ControlComponent.POSTFIX) &&
+        endElement.controlComponent === ControlComponent.POSTFIX) ||
+      (!!startElement.controlId &&
+        endElement.controlId === startElement.controlId &&
+        endElement.controlComponent !== ControlComponent.POSTFIX)
+    )
   }
 
   public isDisabledControl(): boolean {
@@ -395,7 +450,7 @@ export class Control {
         type: ElementType.CONTROL,
         control: startElement.control,
         controlComponent: ControlComponent.PLACEHOLDER,
-        color: this.options.placeholderColor
+        color: this.controlOptions.placeholderColor
       }
       formatElementContext(elementList, [newElement], startIndex)
       this.draw.spliceElementList(
@@ -561,7 +616,7 @@ export class Control {
           const formatValue = [{ value }]
           formatElementList(formatValue, {
             isHandleFirstElement: false,
-            editorOptions: this.draw.getOptions()
+            editorOptions: this.options
           })
           const text = new TextControl(element, this)
           if (value) {
@@ -647,5 +702,54 @@ export class Control {
     for (const elementList of data) {
       setExtension(elementList)
     }
+  }
+
+  public setPropertiesByConceptId(payload: ISetControlProperties) {
+    const isReadonly = this.draw.isReadonly()
+    if (isReadonly) return
+    const { conceptId, properties } = payload
+    let isExistUpdate = false
+    const pageComponentData: IEditorData = {
+      header: this.draw.getHeaderElementList(),
+      main: this.draw.getOriginalMainElementList(),
+      footer: this.draw.getFooterElementList()
+    }
+    for (const key in pageComponentData) {
+      const elementList = pageComponentData[<keyof IEditorData>key]!
+      let i = 0
+      while (i < elementList.length) {
+        const element = elementList[i]
+        i++
+        if (element?.control?.conceptId !== conceptId) continue
+        isExistUpdate = true
+        element.control = {
+          ...element.control,
+          ...properties,
+          value: element.control.value
+        }
+        // 修改后控件结束索引
+        let newEndIndex = i
+        while (newEndIndex < elementList.length) {
+          const nextElement = elementList[newEndIndex]
+          if (nextElement.controlId !== element.controlId) break
+          newEndIndex++
+        }
+        i = newEndIndex
+      }
+    }
+    if (!isExistUpdate) return
+    // 强制更新
+    for (const key in pageComponentData) {
+      const pageComponentKey = <keyof IEditorData>key
+      const elementList = zipElementList(pageComponentData[pageComponentKey]!)
+      pageComponentData[pageComponentKey] = elementList
+      formatElementList(elementList, {
+        editorOptions: this.options
+      })
+    }
+    this.draw.setEditorData(pageComponentData)
+    this.draw.render({
+      isSetCursor: false
+    })
   }
 }

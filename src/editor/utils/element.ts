@@ -57,10 +57,11 @@ export function formatElementList(
     ...options
   }
   const startElement = elementList[0]
+  // 非首字符零宽节点文本元素则补偿
   if (
     isHandleFirstElement &&
-    startElement?.value !== ZERO &&
-    startElement?.value !== '\n'
+    ((startElement?.type && startElement.type !== ElementType.TEXT) ||
+      (startElement?.value !== ZERO && startElement?.value !== '\n'))
   ) {
     elementList.unshift({
       value: ZERO
@@ -109,7 +110,8 @@ export function formatElementList(
       // 格式化元素
       const valueList = el.valueList || []
       formatElementList(valueList, {
-        ...options
+        ...options,
+        isHandleFirstElement: true
       })
       // 追加节点
       if (valueList.length) {
@@ -195,8 +197,13 @@ export function formatElementList(
       }
       i--
     } else if (el.type === ElementType.CONTROL) {
+      // 兼容控件内容类型错误
+      if (!el.control) {
+        i++
+        continue
+      }
       const { prefix, postfix, value, placeholder, code, type, valueSets } =
-        el.control!
+        el.control
       const {
         editorOptions: { control: controlOption, checkbox: checkboxOption }
       } = options
@@ -287,21 +294,22 @@ export function formatElementList(
               }
             }
           }
+          formatElementList(valueList, {
+            ...options,
+            isHandleFirstElement: false
+          })
           for (let v = 0; v < valueList.length; v++) {
             const element = valueList[v]
-            const valueStrList = splitText(element.value)
-            for (let e = 0; e < valueStrList.length; e++) {
-              const value = valueStrList[e]
-              elementList.splice(i, 0, {
-                ...element,
-                controlId,
-                value: value === '\n' ? ZERO : value,
-                type: element.type || ElementType.TEXT,
-                control: el.control,
-                controlComponent: ControlComponent.VALUE
-              })
-              i++
-            }
+            const value = element.value
+            elementList.splice(i, 0, {
+              ...element,
+              controlId,
+              value: value === '\n' ? ZERO : value,
+              type: element.type || ElementType.TEXT,
+              control: el.control,
+              controlComponent: ControlComponent.VALUE
+            })
+            i++
           }
         }
       } else if (placeholder) {
@@ -644,6 +652,8 @@ export function formatElementContext(
   const copyElement = getAnchorElement(sourceElementList, anchorIndex)
   if (!copyElement) return
   const { isBreakWhenWrap = false } = options || {}
+  // 是否已经换行
+  let isBreakWarped = false
   for (let e = 0; e < formatElementList.length; e++) {
     const targetElement = formatElementList[e]
     if (
@@ -651,10 +661,15 @@ export function formatElementContext(
       !copyElement.listId &&
       /^\n/.test(targetElement.value)
     ) {
-      break
+      isBreakWarped = true
     }
-    // 定位元素非列表，无需处理粘贴列表的上下文
-    if (!copyElement.listId && targetElement.type === ElementType.LIST) {
+    // 1. 即使换行停止也要处理表格上下文信息
+    // 2. 定位元素非列表，无需处理粘贴列表的上下文，仅处理表格上下文信息
+    if (
+      isBreakWarped ||
+      (!copyElement.listId && targetElement.type === ElementType.LIST)
+    ) {
+      cloneProperty<IElement>(TABLE_CONTEXT_ATTR, copyElement, targetElement)
       targetElement.valueList?.forEach(valueItem => {
         cloneProperty<IElement>(TABLE_CONTEXT_ATTR, copyElement, valueItem)
       })

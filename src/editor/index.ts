@@ -72,7 +72,12 @@ import { IPageBreak } from './interface/PageBreak'
 import { LETTER_CLASS } from './dataset/constant/Common'
 import { INTERNAL_CONTEXT_MENU_KEY } from './dataset/constant/ContextMenu'
 import { IRange } from './interface/Range'
-import { splitText } from './utils'
+import { deepClone, splitText } from './utils'
+import { IZoneOption } from './interface/Zone'
+import { defaultZoneOption } from './dataset/constant/Zone'
+import { IBackgroundOption } from './interface/Background'
+import { defaultBackground } from './dataset/constant/Background'
+import { BackgroundRepeat, BackgroundSize } from './dataset/enum/Background'
 
 export default class Editor {
   public command: Command
@@ -132,10 +137,19 @@ export default class Editor {
       ...defaultPageBreakOption,
       ...options.pageBreak
     }
+    const zoneOptions: Required<IZoneOption> = {
+      ...defaultZoneOption,
+      ...options.zone
+    }
+    const backgroundOptions: Required<IBackgroundOption> = {
+      ...defaultBackground,
+      ...options.background
+    }
 
     const editorOptions: DeepRequired<IEditorOption> = {
       mode: EditorMode.EDIT,
       defaultType: 'TEXT',
+      defaultColor: '#000000',
       defaultFont: 'Microsoft YaHei',
       defaultSize: 16,
       minSize: 5,
@@ -147,7 +161,6 @@ export default class Editor {
       height: 1123,
       scale: 1,
       pageGap: 20,
-      backgroundColor: '#FFFFFF',
       underlineColor: '#000000',
       strikeoutColor: '#FF0000',
       rangeAlpha: 0.6,
@@ -187,9 +200,12 @@ export default class Editor {
       title: titleOptions,
       placeholder: placeholderOptions,
       group: groupOptions,
-      pageBreak: pageBreakOptions
+      pageBreak: pageBreakOptions,
+      zone: zoneOptions,
+      background: backgroundOptions
     }
     // 数据处理
+    data = deepClone(data)
     let headerElementList: IElement[] = []
     let mainElementList: IElement[] = []
     let footerElementList: IElement[] = []
@@ -284,7 +300,9 @@ export {
   ListType,
   ListStyle,
   WordBreak,
-  ControlIndentation
+  ControlIndentation,
+  BackgroundRepeat,
+  BackgroundSize
 }
 
 // 对外类型

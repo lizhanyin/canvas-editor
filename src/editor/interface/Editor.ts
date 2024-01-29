@@ -5,6 +5,7 @@ import {
   PaperDirection,
   WordBreak
 } from '../dataset/enum/Editor'
+import { IBackgroundOption } from './Background'
 import { ICheckboxOption } from './Checkbox'
 import { IPadding } from './Common'
 import { IControlOption } from './Control'
@@ -18,6 +19,7 @@ import { IPageNumber } from './PageNumber'
 import { IPlaceholder } from './Placeholder'
 import { ITitleOption } from './Title'
 import { IWatermark } from './Watermark'
+import { IZoneOption } from './Zone'
 
 export interface IEditorData {
   header?: IElement[]
@@ -28,6 +30,7 @@ export interface IEditorData {
 export interface IEditorOption {
   mode?: EditorMode
   defaultType?: string
+  defaultColor?: string
   defaultFont?: string
   defaultSize?: number
   minSize?: number
@@ -39,7 +42,6 @@ export interface IEditorOption {
   height?: number
   scale?: number
   pageGap?: number
-  backgroundColor?: string
   underlineColor?: string
   strikeoutColor?: string
   rangeColor?: string
@@ -79,6 +81,8 @@ export interface IEditorOption {
   placeholder?: IPlaceholder
   group?: IGroup
   pageBreak?: IPageBreak
+  zone?: IZoneOption
+  background?: IBackgroundOption
 }
 
 export interface IEditorResult {

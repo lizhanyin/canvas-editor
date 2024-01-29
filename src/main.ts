@@ -424,7 +424,8 @@ window.onload = function () {
           label: '文本',
           name: 'name',
           required: true,
-          placeholder: '请输入文本'
+          placeholder: '请输入文本',
+          value: instance.command.getRangeText()
         },
         {
           type: 'text',
@@ -748,6 +749,9 @@ window.onload = function () {
     instance.command.executeInsertElementList([
       {
         type: ElementType.CHECKBOX,
+        checkbox: {
+          value: false
+        },
         value: ''
       }
     ])
