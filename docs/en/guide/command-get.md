@@ -57,6 +57,16 @@ Usage:
 const wordCount = await instance.command.getWordCount()
 ```
 
+## getRange
+
+Feature: Get range
+
+Usage:
+
+```javascript
+const range = instance.command.getRange()
+```
+
 ## getRangeText
 
 Feature: Get range text
@@ -200,6 +210,16 @@ const {
   value: string | null
   innerText: string | null
 } = await instance.command.getControlValue(payload: IGetControlValueOption)
+```
+
+## getControlList
+
+Feature: Get control list
+
+Usage:
+
+```javascript
+const controlList = await instance.command.getControlList()
 ```
 
 ## getContainer

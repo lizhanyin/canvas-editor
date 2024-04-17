@@ -97,6 +97,7 @@ export class Command {
   public getHTML: CommandAdapt['getHTML']
   public getText: CommandAdapt['getText']
   public getWordCount: CommandAdapt['getWordCount']
+  public getRange: CommandAdapt['getRange']
   public getRangeText: CommandAdapt['getRangeText']
   public getRangeContext: CommandAdapt['getRangeContext']
   public getRangeRow: CommandAdapt['getRangeRow']
@@ -107,6 +108,7 @@ export class Command {
   public getLocale: CommandAdapt['getLocale']
   public getGroupIds: CommandAdapt['getGroupIds']
   public getControlValue: CommandAdapt['getControlValue']
+  public getControlList: CommandAdapt['getControlList']
   public getContainer: CommandAdapt['getContainer']
 
   constructor(adapt: CommandAdapt) {
@@ -209,6 +211,7 @@ export class Command {
     this.getHTML = adapt.getHTML.bind(adapt)
     this.getText = adapt.getText.bind(adapt)
     this.getWordCount = adapt.getWordCount.bind(adapt)
+    this.getRange = adapt.getRange.bind(adapt)
     this.getRangeText = adapt.getRangeText.bind(adapt)
     this.getRangeContext = adapt.getRangeContext.bind(adapt)
     this.getRangeRow = adapt.getRangeRow.bind(adapt)
@@ -226,5 +229,6 @@ export class Command {
     this.executeSetControlProperties = adapt.setControlProperties.bind(adapt)
     this.executeSetControlHighlight = adapt.setControlHighlight.bind(adapt)
     this.getControlValue = adapt.getControlValue.bind(adapt)
+    this.getControlList = adapt.getControlList.bind(adapt)
   }
 }

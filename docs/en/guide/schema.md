@@ -41,6 +41,9 @@ interface IElement {
   };
   rowMargin?: number;
   letterSpacing?: number;
+  textDecoration?: {
+    style?: TextDecorationStyle;
+  };
   // groupIds
   groupIds?: string[];
   // table
@@ -55,8 +58,8 @@ interface IElement {
       rowspan: number;
       verticalAlign?: VerticalAlign;
       backgroundColor?: string;
-      borderType?: TdBorder;
-      slashType?: TdSlash;
+      borderTypes?: TdBorder[];
+      slashTypes?: TdSlash[];
       value: IElement[];
     }[];
   }[];
@@ -81,6 +84,7 @@ interface IElement {
     postfix?: string;
     minWidth?: number;
     underline?: boolean;
+    border?: boolean;
     extension?: unknown;
     indentation?: ControlIndentation;
     deletable?: boolean;
@@ -97,6 +101,13 @@ interface IElement {
       code?: string;
       disabled?: boolean;
     };
+    font?: string;
+    size?: number;
+    bold?: boolean;
+    color?: string;
+    highlight?: string;
+    italic?: boolean;
+    strikeout?: boolean;
   };
   controlComponent?: {
     PREFIX = 'prefix',

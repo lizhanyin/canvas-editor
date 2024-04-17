@@ -31,6 +31,23 @@ export function throttle(func: Function, delay: number) {
   }
 }
 
+export function deepCloneOmitKeys<T, K>(obj: T, omitKeys: (keyof K)[]): T {
+  if (!obj || typeof obj !== 'object') {
+    return obj
+  }
+  let newObj: any = {}
+  if (Array.isArray(obj)) {
+    newObj = obj.map(item => deepCloneOmitKeys(item, omitKeys))
+  } else {
+    // prettier-ignore
+    (Object.keys(obj) as (keyof K)[]).forEach(key => {
+      if (omitKeys.includes(key)) return
+      return (newObj[key] = deepCloneOmitKeys((obj[key as unknown as keyof T] ), omitKeys))
+    })
+  }
+  return newObj
+}
+
 export function deepClone<T>(obj: T): T {
   if (!obj || typeof obj !== 'object') {
     return obj
@@ -39,8 +56,8 @@ export function deepClone<T>(obj: T): T {
   if (Array.isArray(obj)) {
     newObj = obj.map(item => deepClone(item))
   } else {
-    Object.keys(obj as any).forEach(key => {
-      // @ts-ignore
+    // prettier-ignore
+    (Object.keys(obj) as (keyof T)[]).forEach(key => {
       return (newObj[key] = deepClone(obj[key]))
     })
   }
@@ -284,4 +301,14 @@ export function isArrayEqual(arr1: unknown[], arr2: unknown[]): boolean {
     return false
   }
   return !arr1.some(item => !arr2.includes(item))
+}
+
+export function isObjectEqual(obj1: unknown, obj2: unknown): boolean {
+  if (!isObject(obj1) || !isObject(obj2)) return false
+  const obj1Keys = Object.keys(obj1)
+  const obj2Keys = Object.keys(obj2)
+  if (obj1Keys.length !== obj2Keys.length) {
+    return false
+  }
+  return !obj1Keys.some(key => obj2[key] !== obj1[key])
 }

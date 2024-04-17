@@ -1,3 +1,4 @@
+import { ImageDisplay } from '../dataset/enum/Common'
 import { EditorMode, EditorZone } from '../dataset/enum/Editor'
 import { IElement, IElementPosition } from './Element'
 import { IRow } from './Row'
@@ -32,6 +33,11 @@ export interface IDrawRowPayload {
   zone?: EditorZone
 }
 
+export interface IDrawFloatPayload {
+  pageNo: number
+  imgDisplay: ImageDisplay
+}
+
 export interface IDrawPagePayload {
   elementList: IElement[]
   positionList: IElementPosition[]
@@ -54,4 +60,10 @@ export interface IAppendElementListOption {
 export interface IGetImageOption {
   pixelRatio?: number
   mode?: EditorMode
+}
+
+export interface IComputeRowListPayload {
+  innerWidth: number
+  elementList: IElement[]
+  isPagingMode?: boolean
 }

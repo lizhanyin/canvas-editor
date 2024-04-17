@@ -55,7 +55,10 @@ export class Header {
 
   private _computeRowList() {
     const innerWidth = this.draw.getInnerWidth()
-    this.rowList = this.draw.computeRowList(innerWidth, this.elementList)
+    this.rowList = this.draw.computeRowList({
+      innerWidth,
+      elementList: this.elementList
+    })
   }
 
   private _computePositionList() {
@@ -72,7 +75,8 @@ export class Header {
       startIndex: 0,
       startX,
       startY,
-      innerWidth
+      innerWidth,
+      zone: EditorZone.HEADER
     })
   }
 

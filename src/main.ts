@@ -17,6 +17,7 @@ import Editor, {
   PageMode,
   PaperDirection,
   RowFlex,
+  TextDecorationStyle,
   TitleLevel,
   splitText
 } from './editor'
@@ -95,14 +96,28 @@ window.onload = function () {
   const painterDom = document.querySelector<HTMLDivElement>(
     '.menu-item__painter'
   )!
+
+  let isFirstClick = true
+  let painterTimeout: number
   painterDom.onclick = function () {
-    console.log('painter')
-    instance.command.executePainter({
-      isDblclick: false
-    })
+    if (isFirstClick) {
+      isFirstClick = false
+      painterTimeout = window.setTimeout(() => {
+        console.log('painter-click')
+        isFirstClick = true
+        instance.command.executePainter({
+          isDblclick: false
+        })
+      }, 200)
+    } else {
+      window.clearTimeout(painterTimeout)
+    }
   }
+
   painterDom.ondblclick = function () {
-    console.log('painter')
+    console.log('painter-dblclick')
+    isFirstClick = true
+    window.clearTimeout(painterTimeout)
     instance.command.executePainter({
       isDblclick: true
     })
@@ -177,9 +192,26 @@ window.onload = function () {
     '.menu-item__underline'
   )!
   underlineDom.title = `下划线(${isApple ? '⌘' : 'Ctrl'}+U)`
-  underlineDom.onclick = function () {
+  const underlineOptionDom =
+    underlineDom.querySelector<HTMLDivElement>('.options')!
+  underlineDom.querySelector<HTMLSpanElement>('.select')!.onclick =
+    function () {
+      underlineOptionDom.classList.toggle('visible')
+    }
+  underlineDom.querySelector<HTMLElement>('i')!.onclick = function () {
     console.log('underline')
     instance.command.executeUnderline()
+    underlineOptionDom.classList.remove('visible')
+  }
+  underlineDom.querySelector<HTMLUListElement>('ul')!.onmousedown = function (
+    evt
+  ) {
+    const li = evt.target as HTMLLIElement
+    const decorationStyle = <TextDecorationStyle>li.dataset.decorationStyle
+    instance.command.executeUnderline({
+      style: decorationStyle
+    })
+    underlineOptionDom.classList.remove('visible')
   }
 
   const strikeoutDom = document.querySelector<HTMLDivElement>(

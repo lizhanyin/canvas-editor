@@ -244,7 +244,7 @@ instance.command.executeItalic()
 用法：
 
 ```javascript
-instance.command.executeUnderline()
+instance.command.executeUnderline(textDecoration?: ITextDecoration)
 ```
 
 ## executeStrikeout
@@ -284,7 +284,7 @@ instance.command.executeSubscript()
 用法：
 
 ```javascript
-instance.command.executeColor()
+instance.command.executeColor(color: string | null)
 ```
 
 ## executeHighlight
@@ -294,7 +294,7 @@ instance.command.executeColor()
 用法：
 
 ```javascript
-instance.command.executeHighlight()
+instance.command.executeHighlight(color: string | null)
 ```
 
 ## executeTitle

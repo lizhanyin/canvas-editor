@@ -57,6 +57,16 @@ const editorOption = await instance.command.getOptions()
 const wordCount = await instance.command.getWordCount()
 ```
 
+## getRange
+
+功能：获取选区
+
+用法：
+
+```javascript
+const range = instance.command.getRange()
+```
+
 ## getRangeText
 
 功能：获取选区文本
@@ -200,6 +210,16 @@ const {
   value: string | null
   innerText: string | null
 } = await instance.command.getControlValue(payload: IGetControlValueOption)
+```
+
+## getControlList
+
+功能：获取所有控件
+
+用法：
+
+```javascript
+const controlList = await instance.command.getControlList()
 ```
 
 ## getContainer

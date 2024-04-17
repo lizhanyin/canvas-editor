@@ -33,6 +33,7 @@ import { RangeManager } from '../../range/RangeManager'
 import { Draw } from '../Draw'
 import { CheckboxControl } from './checkbox/CheckboxControl'
 import { ControlSearch } from './interactive/ControlSearch'
+import { ControlBorder } from './richtext/Border'
 import { SelectControl } from './select/SelectControl'
 import { TextControl } from './text/TextControl'
 
@@ -41,6 +42,7 @@ interface IMoveCursorResult {
   newElement: IElement
 }
 export class Control {
+  private controlBorder: ControlBorder
   private draw: Draw
   private range: RangeManager
   private listener: Listener
@@ -51,6 +53,8 @@ export class Control {
   private activeControl: IControlInstance | null
 
   constructor(draw: Draw) {
+    this.controlBorder = new ControlBorder(draw)
+
     this.draw = draw
     this.range = draw.getRange()
     this.listener = draw.getListener()
@@ -116,16 +120,26 @@ export class Control {
     })
   }
 
-  // 判断选区部分在控件边界外
-  public isPartRangeInControlOutside(): boolean {
+  // 是否属于控件可以捕获事件的选区
+  public getIsRangeCanCaptureEvent(): boolean {
+    if (!this.activeControl) return false
     const { startIndex, endIndex } = this.getRange()
     if (!~startIndex && !~endIndex) return false
     const elementList = this.getElementList()
     const startElement = elementList[startIndex]
+    // 闭合光标在后缀处
+    if (
+      startIndex === endIndex &&
+      startElement.controlComponent === ControlComponent.POSTFIX
+    ) {
+      return true
+    }
+    // 在控件内
     const endElement = elementList[endIndex]
     if (
       startElement.controlId &&
-      startElement.controlId !== endElement.controlId
+      startElement.controlId === endElement.controlId &&
+      endElement.controlComponent !== ControlComponent.POSTFIX
     ) {
       return true
     }
@@ -133,7 +147,7 @@ export class Control {
   }
 
   // 判断选区是否在后缀处
-  public isRangInPostfix(): boolean {
+  public getIsRangeInPostfix(): boolean {
     if (!this.activeControl) return false
     const { startIndex, endIndex } = this.getRange()
     if (startIndex !== endIndex) return false
@@ -143,7 +157,7 @@ export class Control {
   }
 
   // 判断选区是否在控件内
-  public isRangeWithinControl(): boolean {
+  public getIsRangeWithinControl(): boolean {
     const { startIndex, endIndex } = this.getRange()
     if (!~startIndex && !~endIndex) return false
     const elementList = this.getElementList()
@@ -159,27 +173,7 @@ export class Control {
     return false
   }
 
-  // 判断是否在控件可输入的地方
-  public isRangeCanInput(): boolean {
-    const { startIndex, endIndex } = this.getRange()
-    if (!~startIndex && !~endIndex) return false
-    if (startIndex === endIndex) return true
-    const elementList = this.getElementList()
-    const startElement = elementList[startIndex]
-    const endElement = elementList[endIndex]
-    // 选区前后不是控件 || 选区前不在控件内&&选区后是后缀 || 选区前是控件&&选区后在控件内
-    return (
-      (!startElement.controlId && !endElement.controlId) ||
-      ((!startElement.controlId ||
-        startElement.controlComponent === ControlComponent.POSTFIX) &&
-        endElement.controlComponent === ControlComponent.POSTFIX) ||
-      (!!startElement.controlId &&
-        endElement.controlId === startElement.controlId &&
-        endElement.controlComponent !== ControlComponent.POSTFIX)
-    )
-  }
-
-  public isDisabledControl(): boolean {
+  public getIsDisabledControl(): boolean {
     return !!this.activeControl?.getElement().control?.disabled
   }
 
@@ -207,8 +201,8 @@ export class Control {
     return this.range.getRange()
   }
 
-  public shrinkBoundary() {
-    this.range.shrinkBoundary()
+  public shrinkBoundary(context: IControlContext = {}) {
+    this.range.shrinkBoundary(context)
   }
 
   public getActiveControl(): IControlInstance | null {
@@ -751,5 +745,31 @@ export class Control {
     this.draw.render({
       isSetCursor: false
     })
+  }
+
+  public getList(): IElement[] {
+    const data = [
+      this.draw.getHeader().getElementList(),
+      this.draw.getOriginalMainElementList(),
+      this.draw.getFooter().getElementList()
+    ]
+    const controlElementList: IElement[] = []
+    for (const elementList of data) {
+      for (let e = 0; e < elementList.length; e++) {
+        const element = elementList[e]
+        if (element.controlId) {
+          controlElementList.push(element)
+        }
+      }
+    }
+    return zipElementList(controlElementList)
+  }
+
+  public recordBorderInfo(x: number, y: number, width: number, height: number) {
+    this.controlBorder.recordBorderInfo(x, y, width, height)
+  }
+
+  public drawBorder(ctx: CanvasRenderingContext2D) {
+    this.controlBorder.render(ctx)
   }
 }

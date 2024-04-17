@@ -1,3 +1,6 @@
+import { ImageDisplay } from '../../../dataset/enum/Common'
+import { ControlComponent } from '../../../dataset/enum/Control'
+import { ElementType } from '../../../dataset/enum/Element'
 import { CanvasEvent } from '../CanvasEvent'
 
 export function mousemove(evt: MouseEvent, host: CanvasEvent) {
@@ -20,6 +23,19 @@ export function mousemove(evt: MouseEvent, host: CanvasEvent) {
         y <= rightBottom[1]
       ) {
         return
+      }
+    }
+    const cacheStartIndex = host.cacheRange?.startIndex
+    if (cacheStartIndex) {
+      // 浮动元素拖拽调整位置
+      const dragElement = host.cacheElementList![cacheStartIndex]
+      if (
+        dragElement?.type === ElementType.IMAGE &&
+        (dragElement.imgDisplay === ImageDisplay.FLOAT_TOP ||
+          dragElement.imgDisplay === ImageDisplay.FLOAT_BOTTOM)
+      ) {
+        draw.getPreviewer().clearResizer()
+        draw.getImageParticle().dragFloatImage(evt.movementX, evt.movementY)
       }
     }
     host.dragover(evt)
@@ -77,6 +93,17 @@ export function mousemove(evt: MouseEvent, host: CanvasEvent) {
       [start, end] = [end, start]
     }
     if (start === end) return
+    // 背景文本禁止选区
+    const elementList = draw.getElementList()
+    const startElement = elementList[start + 1]
+    const endElement = elementList[end]
+    if (
+      startElement?.controlComponent === ControlComponent.PLACEHOLDER &&
+      endElement?.controlComponent === ControlComponent.PLACEHOLDER &&
+      startElement.controlId === endElement.controlId
+    ) {
+      return
+    }
     rangeManager.setRange(start, end)
   }
   // 绘制

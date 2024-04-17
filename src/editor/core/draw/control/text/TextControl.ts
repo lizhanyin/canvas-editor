@@ -1,4 +1,7 @@
-import { TEXTLIKE_ELEMENT_TYPE } from '../../../../dataset/constant/Element'
+import {
+  CONTROL_STYLE_ATTR,
+  TEXTLIKE_ELEMENT_TYPE
+} from '../../../../dataset/constant/Element'
 import { ControlComponent } from '../../../../dataset/enum/Control'
 import { KeyMap } from '../../../../dataset/enum/KeyMap'
 import {
@@ -24,9 +27,9 @@ export class TextControl implements IControlInstance {
     return this.element
   }
 
-  public getValue(): IElement[] {
-    const elementList = this.control.getElementList()
-    const { startIndex } = this.control.getRange()
+  public getValue(context: IControlContext = {}): IElement[] {
+    const elementList = context.elementList || this.control.getElementList()
+    const { startIndex } = context.range || this.control.getRange()
     const startElement = elementList[startIndex]
     const data: IElement[] = []
     // 向左查找
@@ -68,13 +71,13 @@ export class TextControl implements IControlInstance {
     options: IControlRuleOption = {}
   ): number {
     // 校验是否可以设置
-    if (!options.isIgnoreDisabledRule && this.control.isDisabledControl()) {
+    if (!options.isIgnoreDisabledRule && this.control.getIsDisabledControl()) {
       return -1
     }
     const elementList = context.elementList || this.control.getElementList()
     const range = context.range || this.control.getRange()
     // 收缩边界到Value内
-    this.control.shrinkBoundary()
+    this.control.shrinkBoundary(context)
     const { startIndex, endIndex } = range
     const draw = this.control.getDraw()
     // 移除选区元素
@@ -90,7 +93,11 @@ export class TextControl implements IControlInstance {
       (startElement.type &&
         !TEXTLIKE_ELEMENT_TYPE.includes(startElement.type)) ||
       startElement.controlComponent === ControlComponent.PREFIX
-        ? pickObject(startElement, ['control', 'controlId'])
+        ? pickObject(startElement, [
+            'control',
+            'controlId',
+            ...CONTROL_STYLE_ATTR
+          ])
         : omitObject(startElement, ['type'])
     // 插入起始位置
     const start = range.startIndex + 1
@@ -111,7 +118,7 @@ export class TextControl implements IControlInstance {
     options: IControlRuleOption = {}
   ): number {
     // 校验是否可以设置
-    if (!options.isIgnoreDisabledRule && this.control.isDisabledControl()) {
+    if (!options.isIgnoreDisabledRule && this.control.getIsDisabledControl()) {
       return -1
     }
     const elementList = context.elementList || this.control.getElementList()
@@ -120,7 +127,7 @@ export class TextControl implements IControlInstance {
     this.control
       .getDraw()
       .spliceElementList(elementList, startIndex + 1, endIndex - startIndex)
-    const value = this.getValue()
+    const value = this.getValue(context)
     if (!value.length) {
       this.control.addPlaceholder(startIndex)
     }
@@ -128,7 +135,7 @@ export class TextControl implements IControlInstance {
   }
 
   public keydown(evt: KeyboardEvent): number | null {
-    if (this.control.isDisabledControl()) {
+    if (this.control.getIsDisabledControl()) {
       return null
     }
     const elementList = this.control.getElementList()
@@ -209,7 +216,7 @@ export class TextControl implements IControlInstance {
   }
 
   public cut(): number {
-    if (this.control.isDisabledControl()) {
+    if (this.control.getIsDisabledControl()) {
       return -1
     }
     this.control.shrinkBoundary()

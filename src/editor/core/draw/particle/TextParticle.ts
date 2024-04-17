@@ -1,7 +1,11 @@
 import { ElementType, IEditorOption, IElement } from '../../..'
-import { PUNCTUATION_LIST } from '../../../dataset/constant/Common'
+import {
+  PUNCTUATION_LIST,
+  METRICS_BASIS_TEXT
+} from '../../../dataset/constant/Common'
 import { DeepRequired } from '../../../interface/Common'
 import { IRowElement } from '../../../interface/Row'
+import { ITextMetrics } from '../../../interface/Text'
 import { Draw } from '../Draw'
 
 export interface IMeasureWordResult {
@@ -30,6 +34,19 @@ export class TextParticle {
     this.text = ''
     this.curStyle = ''
     this.cacheMeasureText = new Map()
+  }
+
+  public measureBasisWord(
+    ctx: CanvasRenderingContext2D,
+    font: string
+  ): ITextMetrics {
+    ctx.save()
+    ctx.font = font
+    const textMetrics = this.measureText(ctx, {
+      value: METRICS_BASIS_TEXT
+    })
+    ctx.restore()
+    return textMetrics
   }
 
   public measureWord(
@@ -70,7 +87,7 @@ export class TextParticle {
   public measureText(
     ctx: CanvasRenderingContext2D,
     element: IElement
-  ): TextMetrics {
+  ): ITextMetrics {
     // 优先使用自定义字宽设置
     if (element.width) {
       const textMetrics = ctx.measureText(element.value)

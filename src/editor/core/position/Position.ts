@@ -1,10 +1,12 @@
-import { ElementType, RowFlex, VerticalAlign } from '../..'
+import { ElementType, ListStyle, RowFlex, VerticalAlign } from '../..'
 import { ZERO } from '../../dataset/constant/Common'
-import { ControlComponent, ImageDisplay } from '../../dataset/enum/Control'
+import { ControlComponent } from '../../dataset/enum/Control'
 import {
   IComputePageRowPositionPayload,
   IComputePageRowPositionResult,
-  IComputeRowPositionPayload
+  IComputeRowPositionPayload,
+  IFloatPosition,
+  IGetFloatPositionByXYPayload
 } from '../../interface/Position'
 import { IEditorOption } from '../../interface/Editor'
 import { IElement, IElementPosition } from '../../interface/Element'
@@ -16,17 +18,20 @@ import {
 import { Draw } from '../draw/Draw'
 import { EditorMode, EditorZone } from '../../dataset/enum/Editor'
 import { deepClone } from '../../utils'
+import { ImageDisplay } from '../../dataset/enum/Common'
 
 export class Position {
   private cursorPosition: IElementPosition | null
   private positionContext: IPositionContext
   private positionList: IElementPosition[]
+  private floatPositionList: IFloatPosition[]
 
   private draw: Draw
   private options: Required<IEditorOption>
 
   constructor(draw: Draw) {
     this.positionList = []
+    this.floatPositionList = []
     this.cursorPosition = null
     this.positionContext = {
       isTable: false,
@@ -35,6 +40,10 @@ export class Position {
 
     this.draw = draw
     this.options = draw.getOptions()
+  }
+
+  public getFloatPositionList(): IFloatPosition[] {
+    return this.floatPositionList
   }
 
   public getTablePositionList(
@@ -87,6 +96,10 @@ export class Position {
     this.positionList = payload
   }
 
+  public setFloatPositionList(payload: IFloatPosition[]) {
+    this.floatPositionList = payload
+  }
+
   public computePageRowPosition(
     payload: IComputePageRowPositionPayload
   ): IComputePageRowPositionResult {
@@ -98,7 +111,8 @@ export class Position {
       startY,
       startRowIndex,
       startIndex,
-      innerWidth
+      innerWidth,
+      zone
     } = payload
     const { scale, tdPadding } = this.options
     let x = startX
@@ -149,6 +163,36 @@ export class Position {
             rightBottom: [x + metrics.width, y + curRow.height]
           }
         }
+        // 缓存浮动元素信息
+        if (
+          element.imgDisplay === ImageDisplay.FLOAT_TOP ||
+          element.imgDisplay === ImageDisplay.FLOAT_BOTTOM
+        ) {
+          // 浮动元素使用上一位置信息
+          const prePosition = positionList[positionList.length - 1]
+          if (prePosition) {
+            positionItem.metrics = prePosition.metrics
+            positionItem.coordinate = prePosition.coordinate
+          }
+          // 兼容浮动元素初始坐标为空的情况-默认使用左上坐标
+          if (!element.imgFloatPosition) {
+            element.imgFloatPosition = {
+              x,
+              y
+            }
+          }
+          this.floatPositionList.push({
+            pageNo,
+            element,
+            position: positionItem,
+            isTable: payload.isTable,
+            index: payload.index,
+            tdIndex: payload.tdIndex,
+            trIndex: payload.trIndex,
+            tdValueIndex: index,
+            zone
+          })
+        }
         positionList.push(positionItem)
         index++
         x += metrics.width
@@ -170,7 +214,12 @@ export class Position {
                 startIndex: 0,
                 startX: (td.x! + tdPadding[3]) * scale + tablePreX,
                 startY: (td.y! + tdPadding[0]) * scale + tablePreY,
-                innerWidth: (td.width! - tdPaddingWidth) * scale
+                innerWidth: (td.width! - tdPaddingWidth) * scale,
+                isTable: true,
+                index: index - 1,
+                tdIndex: d,
+                trIndex: t,
+                zone
               })
               // 垂直对齐方式
               if (
@@ -291,6 +340,15 @@ export class Position {
     const curPageNo = payload.pageNo ?? this.draw.getPageNo()
     const isMainActive = zoneManager.isMainActive()
     const positionNo = isMainActive ? curPageNo : 0
+    // 验证浮于文字上方元素
+    if (!isTable) {
+      const floatTopPosition = this.getFloatPositionByXY({
+        ...payload,
+        imgDisplay: ImageDisplay.FLOAT_TOP
+      })
+      if (floatTopPosition) return floatTopPosition
+    }
+    // 普通元素
     for (let j = 0; j < positionList.length; j++) {
       const {
         index,
@@ -300,6 +358,7 @@ export class Position {
         coordinate: { leftTop, rightTop, leftBottom }
       } = positionList[j]
       if (positionNo !== pageNo) continue
+      if (pageNo > positionNo) break
       // 命中元素
       if (
         leftTop[0] - left <= x &&
@@ -330,6 +389,7 @@ export class Position {
                 return {
                   index,
                   isCheckbox:
+                    tablePosition.isCheckbox ||
                     tdValueElement.type === ElementType.CHECKBOX ||
                     tdValueElement.controlComponent ===
                       ControlComponent.CHECKBOX,
@@ -388,6 +448,14 @@ export class Position {
         }
       }
     }
+    // 验证衬于文字下方元素
+    if (!isTable) {
+      const floatBottomPosition = this.getFloatPositionByXY({
+        ...payload,
+        imgDisplay: ImageDisplay.FLOAT_BOTTOM
+      })
+      if (floatBottomPosition) return floatBottomPosition
+    }
     // 非命中区域
     let isLastArea = false
     let curPositionIndex = -1
@@ -416,17 +484,15 @@ export class Position {
     for (let j = 0; j < lastLetterList.length; j++) {
       const {
         index,
-        pageNo,
+        rowNo,
         coordinate: { leftTop, leftBottom }
       } = lastLetterList[j]
-      if (positionNo !== pageNo) continue
       if (y > leftTop[1] && y <= leftBottom[1]) {
-        const isHead = x < this.options.margins[3]
+        const headIndex = positionList.findIndex(
+          p => p.pageNo === positionNo && p.rowNo === rowNo
+        )
         // 是否在头部
-        if (isHead) {
-          const headIndex = positionList.findIndex(
-            p => p.pageNo === positionNo && p.rowNo === lastLetterList[j].rowNo
-          )
+        if (x < this.options.margins[3]) {
           // 头部元素为空元素时无需选中
           if (~headIndex) {
             if (positionList[headIndex].value === ZERO) {
@@ -439,6 +505,17 @@ export class Position {
             curPositionIndex = index
           }
         } else {
+          // 是否是复选框列表
+          if (
+            elementList[headIndex].listStyle === ListStyle.CHECKBOX &&
+            x < leftTop[0]
+          ) {
+            return {
+              index: headIndex,
+              isDirectHit: true,
+              isCheckbox: true
+            }
+          }
           curPositionIndex = index
         }
         isLastArea = true
@@ -490,6 +567,58 @@ export class Position {
       hitLineStartIndex,
       index: curPositionIndex,
       isControl: !!elementList[curPositionIndex]?.controlId
+    }
+  }
+
+  public getFloatPositionByXY(
+    payload: IGetFloatPositionByXYPayload
+  ): ICurrentPosition | void {
+    const { x, y } = payload
+    const currentZone = this.draw.getZone().getZone()
+    for (let f = 0; f < this.floatPositionList.length; f++) {
+      const {
+        position,
+        element,
+        isTable,
+        index,
+        trIndex,
+        tdIndex,
+        tdValueIndex,
+        zone: floatElementZone
+      } = this.floatPositionList[f]
+      if (
+        element.type === ElementType.IMAGE &&
+        element.imgDisplay === payload.imgDisplay &&
+        (!floatElementZone || floatElementZone === currentZone)
+      ) {
+        const imgFloatPosition = element.imgFloatPosition!
+        if (
+          x >= imgFloatPosition.x &&
+          x <= imgFloatPosition.x + element.width! &&
+          y >= imgFloatPosition.y &&
+          y <= imgFloatPosition.y + element.height!
+        ) {
+          if (isTable) {
+            return {
+              index: index!,
+              isDirectHit: true,
+              isImage: true,
+              isTable,
+              trIndex,
+              tdIndex,
+              tdValueIndex,
+              tdId: element.tdId,
+              trId: element.trId,
+              tableId: element.tableId
+            }
+          }
+          return {
+            index: position.index,
+            isDirectHit: true,
+            isImage: true
+          }
+        }
+      }
     }
   }
 

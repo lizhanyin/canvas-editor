@@ -1,6 +1,7 @@
 import { ElementType } from '../enum/Element'
 import { IElement } from '../../interface/Element'
 import { ITd } from '../../interface/table/Td'
+import { IControlStyle } from '../../interface/Control'
 
 export const EDITOR_ELEMENT_STYLE_ATTR: Array<keyof IElement> = [
   'bold',
@@ -10,7 +11,8 @@ export const EDITOR_ELEMENT_STYLE_ATTR: Array<keyof IElement> = [
   'size',
   'italic',
   'underline',
-  'strikeout'
+  'strikeout',
+  'textDecoration'
 ]
 
 export const EDITOR_ROW_ATTR: Array<keyof IElement> = ['rowFlex', 'rowMargin']
@@ -32,7 +34,8 @@ export const EDITOR_ELEMENT_COPY_ATTR: Array<keyof IElement> = [
   'dateFormat',
   'groupIds',
   'rowFlex',
-  'rowMargin'
+  'rowMargin',
+  'textDecoration'
 ]
 
 export const EDITOR_ELEMENT_ZIP_ATTR: Array<keyof IElement> = [
@@ -64,13 +67,17 @@ export const EDITOR_ELEMENT_ZIP_ATTR: Array<keyof IElement> = [
   'listStyle',
   'listWrap',
   'groupIds',
-  'conceptId'
+  'conceptId',
+  'imgDisplay',
+  'imgFloatPosition',
+  'textDecoration'
 ]
 
 export const TABLE_TD_ZIP_ATTR: Array<keyof ITd> = [
   'verticalAlign',
   'backgroundColor',
-  'borderType'
+  'borderTypes',
+  'slashTypes'
 ]
 
 export const TABLE_CONTEXT_ATTR: Array<keyof IElement> = [
@@ -85,6 +92,22 @@ export const LIST_CONTEXT_ATTR: Array<keyof IElement> = [
   'listId',
   'listType',
   'listStyle'
+]
+
+export const CONTROL_CONTEXT_ATTR: Array<keyof IElement> = [
+  'control',
+  'controlId',
+  'controlComponent'
+]
+
+export const CONTROL_STYLE_ATTR: Array<keyof IControlStyle> = [
+  'font',
+  'size',
+  'bold',
+  'color',
+  'highlight',
+  'italic',
+  'strikeout'
 ]
 
 export const EDITOR_ELEMENT_CONTEXT_ATTR: Array<keyof IElement> = [
